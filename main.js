@@ -341,8 +341,7 @@ class MinimapPlugin extends Plugin {
     this.savedMatchLists = [];
     this.matchListIndicator = null;
     this.currentMatchListData = null;
-    this.headingCache = new Map();
-    this.headingCacheBuilt = false;
+
     this.matchListIndicators = [];
     this._currentIndicatorSelection = null;
     this._currentIndicatorMatchCount = null;
@@ -381,9 +380,7 @@ class MinimapPlugin extends Plugin {
     
     setTimeout(() => {
       this.setupMinimap();
-      if (!this.headingCacheBuilt || this.headingCache.size === 0) {
-        this.buildHeadingCache();
-      }
+
       if (this.settings.floatingToggleVisible) {
         this.createFloatingToggle();
       }
@@ -437,25 +434,7 @@ class MinimapPlugin extends Plugin {
         this._recentSearches = data.recentSearches || [];
         this._recentSearchCachesData = data.recentSearchCaches || [];
         this._listScrollPositions = data.listScrollPositions || {};
-        
-        if (data.headingCache) {
-          const rawCache = data.headingCache;
-          const normalizedCache = new Map();
-          
-          for (const [path, value] of Object.entries(rawCache)) {
-            if (Array.isArray(value)) {
-              normalizedCache.set(path, { headings: value, tags: [] });
-            } else if (value && typeof value === 'object') {
-              normalizedCache.set(path, {
-                headings: value.headings || [],
-                tags: value.tags || []
-              });
-            }
-          }
-          
-          this.headingCache = normalizedCache;
-          this.headingCacheBuilt = normalizedCache.size > 0;
-        }
+
       }
     } catch (e) {
       console.error('Failed to load list data:', e);
@@ -498,7 +477,7 @@ class MinimapPlugin extends Plugin {
         previewSize: this.previewSize,
         matchListSize: this.matchListSize,
         savedMatchLists: this.savedMatchLists,
-        headingCache: Object.fromEntries(this.headingCache),
+
         floatingKeywords: this._floatingKeywordsData || [],
         matchListScrollTop: this._matchListScrollTop || 0,
         recentSearches: this._recentSearches || [],
@@ -636,81 +615,6 @@ class MinimapPlugin extends Plugin {
     }
   }
 
-  async buildHeadingCache() {
-    const allFiles = this.app.vault.getMarkdownFiles();
-    const newCache = new Map();
-    
-    for (const file of allFiles) {
-      try {
-        const content = await this.app.vault.read(file);
-        const lines = content.split('\n');
-        const headings = [];
-        const tags = [];
-        
-        for (const line of lines) {
-          const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
-          if (headingMatch) {
-            const level = headingMatch[1].length;
-            const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
-            headings.push({ text: headingText, level: level });
-          }
-          
-          const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
-          let tagMatch;
-          while ((tagMatch = tagRegex.exec(line)) !== null) {
-            const tagText = tagMatch[1];
-            if (tagText && !tags.includes(tagText) && !this.isColorCode(tagText)) {
-              tags.push(tagText);
-            }
-          }
-        }
-        
-        newCache.set(file.path, { headings, tags });
-      } catch (e) {
-        continue;
-      }
-    }
-    
-    this.headingCache = newCache;
-    this.headingCacheBuilt = true;
-    await this.saveListData();
-  }
-
-  isColorCode(text) {
-    if (/^[a-fA-F0-9]{6}$/.test(text)) return true;
-    if (/^[a-fA-F0-9]{8}$/.test(text)) return true;
-    if (/^[a-fA-F0-9]{3,4}$/.test(text)) return true;
-    return false;
-  }
-
-  updateHeadingCacheForFile(file) {
-    this.app.vault.read(file).then(content => {
-      const lines = content.split('\n');
-      const headings = [];
-      const tags = [];
-      
-      for (const line of lines) {
-        const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
-        if (headingMatch) {
-          const level = headingMatch[1].length;
-          const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
-          headings.push({ text: headingText, level: level });
-        }
-        
-        const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
-        let tagMatch;
-        while ((tagMatch = tagRegex.exec(line)) !== null) {
-          const tagText = tagMatch[1];
-          if (tagText && !tags.includes(tagText) && !this.isColorCode(tagText)) {
-            tags.push(tagText);
-          }
-        }
-      }
-      
-      this.headingCache.set(file.path, { headings, tags });
-      this.saveListData();
-    }).catch(() => {});
-  }
 
   showSettingsPanel(e) {
     e.preventDefault();
@@ -3189,27 +3093,16 @@ class MinimapPlugin extends Plugin {
 
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
-        if (file && file.extension === 'md') {
-          this.updateHeadingCacheForFile(file);
-        }
       })
     );
 
     this.registerEvent(
       this.app.vault.on('delete', (file) => {
-        if (file && file.path) {
-          this.headingCache.delete(file.path);
-          this.saveListData();
-        }
       })
     );
 
     this.registerEvent(
       this.app.vault.on('rename', (file, oldPath) => {
-        if (file && file.extension === 'md') {
-          this.headingCache.delete(oldPath);
-          this.updateHeadingCacheForFile(file);
-        }
       })
     );
 
@@ -3712,44 +3605,9 @@ class MinimapPlugin extends Plugin {
       if (fileMap.size >= 50) break;
     }
 
-    if (this.headingCacheBuilt && this.headingCache.size > 0) {
-      for (const file of allFiles) {
-        if (this._searchCancelled) {
-          this._searchInProgress = false;
-          return;
-        }
-        if (fileMap.has(file)) continue;
-        
-        const cachedData = this.headingCache.get(file.path);
-        if (!cachedData) continue;
-        
-        const matchedItems = [];
-        
-        if (cachedData.headings) {
-          const matchedHeadings = cachedData.headings.filter(h => h.text.toLowerCase().includes(searchLower));
-          matchedItems.push(...matchedHeadings.map(h => ({ text: h.text, level: h.level, type: 'heading' })));
-        }
-        
-        if (cachedData.tags) {
-          const matchedTags = cachedData.tags.filter(t => t.toLowerCase().includes(searchLower));
-          for (const tag of matchedTags) {
-            if (!matchedItems.some(m => m.text === tag && m.type === 'tag')) {
-              matchedItems.push({ text: tag, level: 0, type: 'tag' });
-            }
-          }
-        }
-        
-        if (matchedItems.length > 0) {
-          fileMap.set(file, matchedItems);
-          totalAllDocMatches += matchedItems.length;
-        }
-        
-        if (fileMap.size >= 50) break;
-      }
-    } else {
-      const remainingFiles = allFiles.filter(f => !fileMap.has(f));
-      
-      for (const file of remainingFiles) {
+    const remainingFiles = allFiles.filter(f => !fileMap.has(f));
+    
+    for (const file of remainingFiles) {
         if (this._searchCancelled) {
           this._searchInProgress = false;
           return;
@@ -3760,61 +3618,29 @@ class MinimapPlugin extends Plugin {
           const content = await this.app.vault.cachedRead(file);
           if (content && content.toLowerCase().includes(searchLower)) {
             const lines = content.split('\n');
-            const headings = [];
-            const tags = [];
-            
-            for (const line of lines) {
-              const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
-              if (headingMatch) {
-                const level = headingMatch[1].length;
-                const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
-                if (headingText.toLowerCase().includes(searchLower)) {
-                  headings.push({ text: headingText, level: level, type: 'heading' });
-                }
-              }
-              
-              const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
-              let tagMatch;
-              while ((tagMatch = tagRegex.exec(line)) !== null) {
-                const tagText = tagMatch[1];
-                if (tagText && tagText.toLowerCase().includes(searchLower) && !this.isColorCode(tagText)) {
-                  if (!tags.includes(tagText)) {
-                    tags.push({ text: tagText, level: 0, type: 'tag' });
+            const snippets = [];
+            for (let i = 0; i < lines.length && snippets.length < 3; i++) {
+              const lineLower = lines[i].toLowerCase();
+              const idx = lineLower.indexOf(searchLower);
+              if (idx !== -1) {
+                const trimmed = lines[i].trim();
+                if (trimmed.length > 0) {
+                  let snippet = trimmed;
+                  if (snippet.length > 120) {
+                    const matchIdx = snippet.toLowerCase().indexOf(searchLower);
+                    const start = Math.max(0, matchIdx - 30);
+                    const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+                    snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
                   }
+                  snippets.push(snippet);
                 }
               }
             }
-            
-            const matchedItems = [...headings, ...tags];
-            if (matchedItems.length > 0) {
-              fileMap.set(file, matchedItems);
-              totalAllDocMatches += matchedItems.length;
+            if (snippets.length > 0) {
+              fileMap.set(file, [{ text: file.basename, level: 0, type: 'content', snippets }]);
+              totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
             } else {
-              // Extract content snippets for body matches
-              const snippets = [];
-              for (let i = 0; i < lines.length && snippets.length < 3; i++) {
-                const lineLower = lines[i].toLowerCase();
-                const idx = lineLower.indexOf(searchLower);
-                if (idx !== -1) {
-                  const trimmed = lines[i].trim();
-                  if (trimmed.length > 0) {
-                    let snippet = trimmed;
-                    if (snippet.length > 120) {
-                      const matchIdx = snippet.toLowerCase().indexOf(searchLower);
-                      const start = Math.max(0, matchIdx - 30);
-                      const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
-                      snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
-                    }
-                    snippets.push(snippet);
-                  }
-                }
-              }
-              if (snippets.length > 0) {
-                fileMap.set(file, [{ text: file.basename, level: 0, type: 'content', snippets }]);
-                totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
-              } else {
-                fileMap.set(file, [{ text: file.basename, level: 0 }]);
-              }
+              fileMap.set(file, [{ text: file.basename, level: 0 }]);
             }
           }
         } catch (e) {
@@ -4119,103 +3945,17 @@ class MinimapPlugin extends Plugin {
       }
     }
 
-    if (this.headingCacheBuilt && this.headingCache.size > 0) {
-      for (const file of allFiles) {
-        if (this._searchCancelled) {
-          this._searchInProgress = false;
-          return;
-        }
-        if (fileMap.has(file)) continue;
-        
-        const cachedData = this.headingCache.get(file.path);
-        if (!cachedData) continue;
-        
-        const matchedItems = [];
-        
-        if (cachedData.headings) {
-          const matchedHeadings = cachedData.headings.filter(h => h.text.toLowerCase().includes(searchLower));
-          matchedItems.push(...matchedHeadings.map(h => ({ text: h.text, level: h.level, type: 'heading' })));
-        }
-        
-        if (cachedData.tags) {
-          const matchedTags = cachedData.tags.filter(t => t.toLowerCase().includes(searchLower));
-          for (const tag of matchedTags) {
-            if (!matchedItems.some(m => m.text === tag && m.type === 'tag')) {
-              matchedItems.push({ text: tag, level: 0, type: 'tag' });
-            }
-          }
-        }
-        
-        if (matchedItems.length > 0) {
-          fileMap.set(file, matchedItems);
-          // Count total matches in this file from cache
-          const cachedContent = this.headingCache.get(file.path);
-          if (cachedContent && cachedContent.content) {
-            totalAllDocMatches += cachedContent.content.toLowerCase().split(searchLower).length - 1;
-          } else {
-            totalAllDocMatches += matchedItems.length;
-          }
-          
-          if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
-            this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
-            if (this._isListVisible) {
-              const isFirstMatch = fileMap.size === 1;
-              this.renderMatchList(fileMap, matchCount, !isFirstMatch);
-            }
-          }
-        }
-        
-        if (fileMap.size >= 50) break;
-      }
-    } else {
-      const remainingFiles = allFiles.filter(f => !fileMap.has(f));
-      
-      for (const file of remainingFiles) {
+    const remainingFiles = allFiles.filter(f => !fileMap.has(f));
+    
+    for (const file of remainingFiles) {
         if (this._searchCancelled) {
           this._searchInProgress = false;
           return;
         }
         try {
           const content = await this.app.vault.read(file);
-          const lines = content.split('\n');
-          const matchedItems = [];
-          
-          for (const line of lines) {
-            if (this._searchCancelled) {
-              this._searchInProgress = false;
-              return;
-            }
-            const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
-            if (headingMatch) {
-              const level = headingMatch[1].length;
-              const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
-              if (headingText.toLowerCase().includes(searchLower)) {
-                matchedItems.push({ text: headingText, level: level, type: 'heading' });
-              }
-            }
-            
-            const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
-            let tagMatch;
-            while ((tagMatch = tagRegex.exec(line)) !== null) {
-              const tagText = tagMatch[1];
-              if (tagText && !this.isColorCode(tagText) && tagText.toLowerCase().includes(searchLower)) {
-                if (!matchedItems.some(m => m.text === tagText && m.type === 'tag')) {
-                  matchedItems.push({ text: tagText, level: 0, type: 'tag' });
-                }
-              }
-            }
-          }
-          
-          if (matchedItems.length > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
-            fileMap.set(file, matchedItems);
-            totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
-            this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
-            if (this._isListVisible) {
-              const isFirstMatch = fileMap.size === 1;
-              this.renderMatchList(fileMap, matchCount, !isFirstMatch);
-            }
-          } else if (content.toLowerCase().includes(searchLower)) {
-            // No heading/tag matches but body content matches - extract snippets
+          if (content && content.toLowerCase().includes(searchLower)) {
+            const lines = content.split('\n');
             const snippets = [];
             for (let i = 0; i < lines.length && snippets.length < 3; i++) {
               const lineLower = lines[i].toLowerCase();
@@ -4250,7 +3990,6 @@ class MinimapPlugin extends Plugin {
         
         if (fileMap.size >= 50) break;
       }
-    }
 
     if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
       this._cachedMatchList = fileMap;
