@@ -1,0 +1,6721 @@
+const { Plugin, WorkspaceLeaf, MarkdownRenderer, Notice } = require('obsidian');
+const { Decoration, EditorView } = require('@codemirror/view');
+const { StateField, StateEffect } = require('@codemirror/state');
+
+const setMatchHighlights = StateEffect.define();
+
+const matchHighlightField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    decorations = decorations.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setMatchHighlights)) {
+        decorations = e.value;
+      }
+    }
+    return decorations;
+  },
+  provide: field => EditorView.decorations.from(field)
+});
+
+const setJumpHighlight = StateEffect.define();
+const jumpHighlightField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setJumpHighlight)) {
+        decorations = e.value;
+      }
+    }
+    return decorations.map(tr.changes);
+  },
+  provide: field => EditorView.decorations.from(field)
+});
+
+class MatchHighlightPlugin {
+  constructor(view) {
+    this.view = view;
+  }
+
+  update() {}
+}
+
+const DEFAULT_SETTINGS = {
+  top: 80,
+  width: 2,
+  maxWidth: 80,
+  heightOffset: 100,
+  opacity: 0.3,
+  editorPadding: 10,
+  sliderColor: '#888888',
+  highlightColor: '#ffc800',
+  highlightCurrentColor: '#ff3232',
+  contentOpacity: 0.4,
+  collapseOnHover: true,
+  collapseWidth: 8,
+  matchBorderColor: '#ff6600',
+  matchBorderWidth: 2,
+  matchBorderOpacity: 1.0,
+  counterOpacity: 1.0,
+  counterBgOpacity: 1.0,
+  counterColor: '#ffffff',
+  counterBgColor: '#ff6600',
+  counterSize: 9,
+  counterPaddingH: 2,
+  counterPaddingV: 0,
+  counterTopOffset: -10,
+  enableSelectionMatch: true,
+  exhaustiveMode: true,
+  matchListWidth: 280,
+  matchListHeight: 400,
+  floatingToggleX: 50,
+  floatingToggleY: 100,
+  floatingToggleSize: 20,
+  floatingToggleVisible: false,
+  floatingToggleOpacity: 0.6,
+  hideStatusBar: false,
+  rightOffset: 0,
+  pinIconEnabled: true,
+  pinIconMode: 'follow',
+  pinIconSize: 20,
+  pinIconOpacity: 0.8,
+  pinIconFixedLeft: null,
+  pinIconFixedTop: null,
+  pinIconText: 'm',
+  pinColorSchemes: [
+    { borderColor: '#ff6600', counterBgColor: '#ff6600', counterColor: '#ffffff' },
+    { borderColor: '#2196F3', counterBgColor: '#2196F3', counterColor: '#ffffff' },
+    { borderColor: '#4CAF50', counterBgColor: '#4CAF50', counterColor: '#ffffff' },
+    { borderColor: '#9C27B0', counterBgColor: '#9C27B0', counterColor: '#ffffff' },
+    { borderColor: '#FF9800', counterBgColor: '#FF9800', counterColor: '#ffffff' },
+    { borderColor: '#E91E63', counterBgColor: '#E91E63', counterColor: '#ffffff' }
+  ],
+  simplifiedColorScheme: true,
+  clearCountOnClose: false,
+  floatingToggleText: 'Swift',
+  floatingToggleFontSize: 11,
+  floatingTogglePaddingH: 10,
+  floatingTogglePaddingV: 2,
+  searchWordCountMin: 0,
+  searchWordCountMax: 0,
+  language: 'zh'
+};
+
+const I18N = {
+  zh: {
+    settingsTitle: 'SwiftMatch 设置',
+    tabBasic: '基础',
+    tabCounter: '计数样式',
+    tabPinned: '已固定',
+    topDistance: '顶部距离 (px)',
+    width: '宽度 (%)',
+    maxWidth: '最大宽度 (px)',
+    bottomOffset: '底部偏移 (px)',
+    rightOffset: '右边偏移 (px)',
+    sliderColor: '滑块颜色',
+    opacity: '透明度',
+    contentOpacity: '内容透明度',
+    hoverExpand: '悬停展开',
+    collapseWidth: '折叠宽度 (px)',
+    floatingToggleText: '悬浮球显示文字',
+    showFloating: '悬浮显示',
+    floatingToggleStyle: '悬浮球样式',
+    fontSize: '文字大小 (px)',
+    paddingH: '水平内边距 (px)',
+    paddingV: '垂直内边距 (px)',
+    hideStatusBar: '隐藏底部状态栏',
+    searchLimit: '搜索限制',
+    minWords: '最少字数 (0=不限)',
+    maxWords: '最多字数 (0=不限)',
+    pinIcon: '固定图标',
+    enablePinIcon: '启用固定图标',
+    iconMode: '图标模式',
+    followMouse: '跟随鼠标',
+    fixedPosition: '固定位置',
+    iconSize: '图标大小 (px)',
+    iconOpacity: '图标透明度',
+    iconText: '图标文字',
+    colorSchemes: '配色方案 (按顺序使用)',
+    simplifiedColor: '简化配色',
+    addColor: '+ 添加配色',
+    counterStyle: '计数样式',
+    underline: '下划线 (px)',
+    counterOpacity: '计数透明度',
+    counterBgOpacity: '计数背景透明度',
+    counterFontSize: '计数字体大小',
+    counterPaddingH: '计数水平内边距 (px)',
+    counterPaddingV: '计数垂直内边距 (px)',
+    counterTopOffset: '计数上偏移 (px)',
+    clearCountOnClose: '关闭文档清除计数',
+    pinnedMatches: '已固定匹配项',
+    clearAllCounts: '清除所有计数',
+    rebuildCache: '重建标题缓存',
+    resetDefault: '重置默认',
+    about: '关于/更新',
+    building: '正在构建...',
+    border: '边框',
+    background: '背景',
+    text: '文字',
+    noPinned: '暂无固定匹配项',
+    unknownFile: '未知文件',
+    clearDocPinned: '清除该文档所有固定项',
+    clear: '清除',
+    remove: '删除',
+    searchPlaceholder: '搜索...',
+    unpin: '取消固定',
+    clearPinned: (n) => `清除${n}个固定项`,
+    pinMatch: '固定此匹配',
+    recentSearch: '最近搜索',
+    floatThisWord: '悬浮此词',
+    removeFloat: '移除悬浮此词',
+    exhaustiveMatch: (n, m) => `全库匹配: ${n} 个文档 (${m} 项结果)`,
+    libraryMatch: (n, m) => `库中匹配: ${n} 个文档 (${m} 项结果)`,
+    save: '保存',
+    exportMarkdown: '导出匹配结果为 Markdown',
+    copy: '复制',
+    openDoc: '打开文档',
+    exported: (f) => `已导出: ${f}`,
+    exportFailed: (e) => `导出失败: ${e}`,
+    sourceNotFound: (f) => `找不到源文档: ${f}`
+  },
+  en: {
+    settingsTitle: 'SwiftMatch Settings',
+    tabBasic: 'Basic',
+    tabCounter: 'Counter Style',
+    tabPinned: 'Pinned',
+    topDistance: 'Top Distance (px)',
+    width: 'Width (%)',
+    maxWidth: 'Max Width (px)',
+    bottomOffset: 'Bottom Offset (px)',
+    rightOffset: 'Right Offset (px)',
+    sliderColor: 'Slider Color',
+    opacity: 'Opacity',
+    contentOpacity: 'Content Opacity',
+    hoverExpand: 'Hover Expand',
+    collapseWidth: 'Collapse Width (px)',
+    floatingToggleText: 'Floating Toggle Text',
+    showFloating: 'Show Floating',
+    floatingToggleStyle: 'Floating Toggle Style',
+    fontSize: 'Font Size (px)',
+    paddingH: 'Horizontal Padding (px)',
+    paddingV: 'Vertical Padding (px)',
+    hideStatusBar: 'Hide Status Bar',
+    searchLimit: 'Search Limits',
+    minWords: 'Min Words (0=no limit)',
+    maxWords: 'Max Words (0=no limit)',
+    pinIcon: 'Pin Icon',
+    enablePinIcon: 'Enable Pin Icon',
+    iconMode: 'Icon Mode',
+    followMouse: 'Follow Mouse',
+    fixedPosition: 'Fixed Position',
+    iconSize: 'Icon Size (px)',
+    iconOpacity: 'Icon Opacity',
+    iconText: 'Icon Text',
+    colorSchemes: 'Color Schemes (used in order)',
+    simplifiedColor: 'Simplified Colors',
+    addColor: '+ Add Color',
+    counterStyle: 'Counter Style',
+    underline: 'Underline (px)',
+    counterOpacity: 'Counter Opacity',
+    counterBgOpacity: 'Counter BG Opacity',
+    counterFontSize: 'Counter Font Size',
+    counterPaddingH: 'Counter H Padding (px)',
+    counterPaddingV: 'Counter V Padding (px)',
+    counterTopOffset: 'Counter Top Offset (px)',
+    clearCountOnClose: 'Clear Count on Close',
+    pinnedMatches: 'Pinned Matches',
+    clearAllCounts: 'Clear All Counts',
+    rebuildCache: 'Rebuild Heading Cache',
+    resetDefault: 'Reset Defaults',
+    about: 'About/Updates',
+    building: 'Building...',
+    border: 'Border',
+    background: 'Background',
+    text: 'Text',
+    noPinned: 'No pinned matches',
+    unknownFile: 'Unknown file',
+    clearDocPinned: 'Clear all pinned items for this doc',
+    clear: 'Clear',
+    remove: 'Remove',
+    searchPlaceholder: 'Search...',
+    unpin: 'Unpin',
+    clearPinned: (n) => `Clear ${n} pinned items`,
+    pinMatch: 'Pin this match',
+    recentSearch: 'Recent Searches',
+    floatThisWord: 'Float this word',
+    removeFloat: 'Remove floating',
+    exhaustiveMatch: (n, m) => `Exhaustive: ${n} docs (${m} results)`,
+    libraryMatch: (n, m) => `Library: ${n} docs (${m} results)`,
+    save: 'Save',
+    exportMarkdown: 'Export results as Markdown',
+    copy: 'Copy',
+    openDoc: 'Open Document',
+    exported: (f) => `Exported: ${f}`,
+    exportFailed: (e) => `Export failed: ${e}`,
+    sourceNotFound: (f) => `Source not found: ${f}`
+  }
+};
+
+function t(key, ...args) {
+  const lang = (typeof window !== 'undefined' && window._swiftMatchLang) || 'zh';
+  const val = I18N[lang]?.[key] ?? I18N.zh[key];
+  if (typeof val === 'function') return val(...args);
+  return val;
+}
+
+class MinimapPlugin extends Plugin {
+  constructor(app, manifest) {
+    super(app, manifest);
+    this.manifest = manifest;
+    this.minimapContainer = null;
+    this.minimapContent = null;
+    this.scrollbar = null;
+    this.isDraggingScrollbar = false;
+    this.scrollbarDragStartY = 0;
+    this.scrollbarDragStartScrollTop = 0;
+    this.slider = null;
+    this.isDragging = false;
+    this.isJumping = false;
+    this.dragStartY = 0;
+    this.dragStartLine = 0;
+    this.highlights = [];
+    this.editorHighlights = [];
+    this.decorationField = null;
+    this.currentSelection = '';
+    this.currentCursor = null;
+    this.updateTimer = null;
+    this.boundMouseMove = null;
+    this.boundMouseUp = null;
+    this.boundOutsideClick = null;
+    this.scrollHandler = null;
+    this.editorScrollEl = null;
+    this.opacity = 0.3;
+    this.boundWheel = null;
+    this.editorContentEl = null;
+    this.originalPaddingRight = '';
+    this.settings = Object.assign({}, DEFAULT_SETTINGS);
+    this.settingsPanel = null;
+    this.boundContextMenu = null;
+    this.tooltip = null;
+    this.matchList = null;
+    this.previewPanel = null;
+    this.isPreviewOpen = false;
+    this.originalListPosition = 'right';
+    this.isInteractingWithList = false;
+    this.currentPreviewFile = null;
+    this.currentPreviewHeading = null;
+    this._previewOutsideClickHandler = null;
+    this._listCloseHandler = null;
+    this._pendingListClose = false;
+    this.previewSourceLeaf = null;
+    this._searchCancelled = false;
+    this._searchInProgress = false;
+    this._isListVisible = false;
+    this._listUserDismissed = false;
+    this._keepListVisible = false;
+    this._listPinnedSearchText = null;
+    this._pinnedWordFileMap = null;
+    this._pinnedWordMatchCount = 0;
+    this._pendingShowList = null;
+    this._triggeredByIndicator = false;
+    this._cachedMatchList = null;
+    this._cachedMatchListKey = null;
+    this.listPosition = { left: null, top: null };
+    this.listFixedPosition = { left: null, top: null };
+    this.previewListPosition = { left: null, top: null };
+    this.listOpacity = 1.0;
+    this.previewOpacity = 1.0;
+    this.previewSize = { width: 600, height: 600 };
+    this.matchListSize = { width: null, height: null };
+    this.isDraggingList = false;
+    this.listDragStartX = 0;
+    this.listDragStartY = 0;
+    this.listDragStartLeft = 0;
+    this.listDragStartTop = 0;
+    this.boundListWheel = null;
+    this.listDataPath = null;
+    this.savedMatchLists = [];
+    this.matchListIndicator = null;
+    this.currentMatchListData = null;
+    this.headingCache = new Map();
+    this.headingCacheBuilt = false;
+    this.matchListIndicators = [];
+    this._currentIndicatorSelection = null;
+    this._currentIndicatorMatchCount = null;
+    this.lastIndicatorCoords = null;
+    this.floatingToggle = null;
+    this._isApplyingReadingHighlights = false;
+    this._readingViewObserver = null;
+    this._readingHighlightRetryTimer = null;
+    this._pinIcon = null;
+    this._pinIconFollowHandler = null;
+    this._lastMouseX = 0;
+    this._lastMouseY = 0;
+    this._recentSearches = [];
+    this._recentSearchCaches = {}; // { term: { fileMap, matchCount } }
+    this._recentSearchCachesData = []; // persisted form
+    this._listScrollPositions = {}; // { term: scrollTop }
+    this._floatingKeywordButtons = []; // [{ wrapper, term, fileMap, matchCount, position }]
+    this._floatingKeywordsData = []; // [{ term, position, fileMapData, matchCount }] persisted
+    this._listTriggerElement = null; // element that triggered the list display (keyword btn or floating toggle)
+  }
+
+  onload() {
+    this.loadSettings();
+    this.loadListData();
+    this.opacity = this.settings.opacity;
+    this.addCommands();
+    this.boundMouseMove = this.handleMouseMove.bind(this);
+    this.boundMouseUp = this.handleMouseUp.bind(this);
+    this.boundWheel = this.handleWheel.bind(this);
+    this.boundContextMenu = this.showSettingsPanel.bind(this);
+    this.boundListWheel = this.handleListWheel.bind(this);
+    document.addEventListener('mousemove', this.boundMouseMove);
+    document.addEventListener('mouseup', this.boundMouseUp);
+    
+    this.registerEvents();
+    
+    setTimeout(() => {
+      this.setupMinimap();
+      if (!this.headingCacheBuilt || this.headingCache.size === 0) {
+        this.buildHeadingCache();
+      }
+      if (this.settings.floatingToggleVisible) {
+        this.createFloatingToggle();
+      }
+      // Restore floating keyword buttons
+      this._restoreFloatingKeywordButtons();
+      // Restore recent search caches
+      this._restoreRecentSearchCaches();
+    }, 300);
+  }
+
+  loadSettings() {
+    const saved = localStorage.getItem('swift-match-settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, parsed);
+        this.settings.exhaustiveMode = true;
+        if (!this.settings.pinColorSchemes || !Array.isArray(this.settings.pinColorSchemes) || this.settings.pinColorSchemes.length === 0) {
+          this.settings.pinColorSchemes = DEFAULT_SETTINGS.pinColorSchemes.map(s => ({...s}));
+        }
+      } catch (e) {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS);
+      }
+    }
+    window._swiftMatchLang = this.settings.language || 'zh';
+  }
+
+  saveSettings() {
+    localStorage.setItem('swift-match-settings', JSON.stringify(this.settings));
+  }
+
+  async loadListData() {
+    const dataDir = this.app.vault.configDir || '.obsidian';
+    this.listDataPath = `${dataDir}/plugins/swift-match/list-data.json`;
+    
+    try {
+      const adapter = this.app.vault.adapter;
+      if (await adapter.exists(this.listDataPath)) {
+        const content = await adapter.read(this.listDataPath);
+        const data = JSON.parse(content);
+        this.listPosition = data.listPosition || { left: null, top: null };
+        this.listFixedPosition = data.listFixedPosition || { left: null, top: null };
+        this.previewListPosition = data.previewListPosition || { left: null, top: null };
+        this.listOpacity = data.listOpacity ?? 1.0;
+        this.previewOpacity = data.previewOpacity ?? 1.0;
+        this.previewSize = data.previewSize || { width: 600, height: 600 };
+        this.matchListSize = data.matchListSize || { width: null, height: null };
+        this.savedMatchLists = data.savedMatchLists || [];
+        this._floatingKeywordsData = data.floatingKeywords || [];
+        this._matchListScrollTop = data.matchListScrollTop || 0;
+        this._recentSearches = data.recentSearches || [];
+        this._recentSearchCachesData = data.recentSearchCaches || [];
+        this._listScrollPositions = data.listScrollPositions || {};
+        
+        if (data.headingCache) {
+          const rawCache = data.headingCache;
+          const normalizedCache = new Map();
+          
+          for (const [path, value] of Object.entries(rawCache)) {
+            if (Array.isArray(value)) {
+              normalizedCache.set(path, { headings: value, tags: [] });
+            } else if (value && typeof value === 'object') {
+              normalizedCache.set(path, {
+                headings: value.headings || [],
+                tags: value.tags || []
+              });
+            }
+          }
+          
+          this.headingCache = normalizedCache;
+          this.headingCacheBuilt = normalizedCache.size > 0;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load list data:', e);
+      this.listPosition = { left: null, top: null };
+      this.listFixedPosition = { left: null, top: null };
+      this.previewListPosition = { left: null, top: null };
+      this.listOpacity = 1.0;
+      this.previewOpacity = 1.0;
+      this.previewSize = { width: 600, height: 600 };
+      this.matchListSize = { width: null, height: null };
+      this.savedMatchLists = [];
+    }
+  }
+
+  async saveListData() {
+    if (!this.listDataPath) return;
+    
+    try {
+      const adapter = this.app.vault.adapter;
+      const recentSearchCachesData = [];
+      for (const [term, cache] of Object.entries(this._recentSearchCaches)) {
+        if (cache && cache.fileMap && cache.fileMap.size > 0) {
+          recentSearchCachesData.push({
+            term,
+            matchCount: cache.matchCount || 0,
+            fileMapData: Array.from(cache.fileMap.entries()).map(([file, headings]) => ({
+              path: file.path,
+              basename: file.basename,
+              headings
+            }))
+          });
+        }
+      }
+      const data = {
+        listPosition: this.listPosition,
+        listFixedPosition: this.listFixedPosition,
+        previewListPosition: this.previewListPosition,
+        listOpacity: this.listOpacity,
+        previewOpacity: this.previewOpacity,
+        previewSize: this.previewSize,
+        matchListSize: this.matchListSize,
+        savedMatchLists: this.savedMatchLists,
+        headingCache: Object.fromEntries(this.headingCache),
+        floatingKeywords: this._floatingKeywordsData || [],
+        matchListScrollTop: this._matchListScrollTop || 0,
+        recentSearches: this._recentSearches || [],
+        recentSearchCaches: recentSearchCachesData,
+        listScrollPositions: this._listScrollPositions || {}
+      };
+      await adapter.write(this.listDataPath, JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.error('Failed to save list data:', e);
+    }
+  }
+
+  applySettings() {
+    if (!this.minimapContainer) return;
+    
+    const s = this.settings;
+    this.minimapContainer.style.top = `${s.top}px`;
+    this.minimapContainer.style.right = `${s.rightOffset}px`;
+    this.minimapContainer.style.width = `${s.width}%`;
+    this.minimapContainer.style.maxWidth = `${s.maxWidth}px`;
+    this.minimapContainer.style.height = `calc(100vh - ${s.top}px - ${s.heightOffset}px)`;
+    this.minimapContainer.style.opacity = s.opacity;
+    this.opacity = s.opacity;
+    
+    if (this.slider) {
+      this.slider.style.backgroundColor = s.sliderColor;
+    }
+    
+    if (this.minimapContent) {
+      this.minimapContent.style.opacity = s.contentOpacity;
+    }
+    
+    if (this.minimapContainer) {
+      if (s.collapseOnHover) {
+        this.minimapContainer.classList.add('collapsed');
+        this.minimapContainer.style.setProperty('--collapse-width', `${s.collapseWidth}px`);
+      } else {
+        this.minimapContainer.classList.remove('collapsed');
+      }
+    }
+    
+    this.removeEditorPadding();
+    this.applyEditorPadding();
+    this.updateViewport();
+    this.applyHideStatusBar();
+  }
+
+  applyCounterStyles() {
+    const s = this.settings;
+    const counterOpacity = s.counterOpacity;
+    const counterBgOpacity = s.counterBgOpacity;
+    const counterSize = s.counterSize;
+    const counterPadding = `${s.counterPaddingV}px ${s.counterPaddingH}px`;
+    const counterTopOffset = `${s.counterTopOffset}px`;
+
+    // 更新阅读模式
+    const readingEl = document.querySelector('.markdown-reading-view');
+    if (readingEl) {
+      readingEl.style.setProperty('--minimap-counter-opacity', counterOpacity);
+      readingEl.style.setProperty('--minimap-counter-size', `${counterSize}px`);
+      readingEl.style.setProperty('--minimap-counter-padding', counterPadding);
+      readingEl.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
+    }
+
+    // 更新编辑器模式
+    const editor = this.getEditor();
+    if (editor && editor.cm && editor.cm.scrollDOM) {
+      const scrollDOM = editor.cm.scrollDOM;
+      scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
+      scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
+      scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
+      scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
+      // 背景透明度也需要更新（颜色从配色方案获取）
+      const counterColor = s.counterColor;
+      const counterBgColor = s.counterBgColor;
+      scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
+      scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+      if (readingEl) {
+        readingEl.style.setProperty('--minimap-counter-color', counterColor);
+        readingEl.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+      }
+    }
+  }
+
+  initCollapsibleSections() {
+    if (!this.settingsPanel) return;
+    const titles = this.settingsPanel.querySelectorAll('.minimap-settings-section-title');
+    titles.forEach(title => {
+      title.style.cursor = 'pointer';
+      title.style.userSelect = 'none';
+      // 添加折叠箭头
+      if (!title.querySelector('.collapse-arrow')) {
+        const arrow = document.createElement('span');
+        arrow.className = 'collapse-arrow';
+        arrow.textContent = ' ▾';
+        arrow.style.cssText = 'font-size:10px;float:right;transition:transform 0.2s;';
+        title.appendChild(arrow);
+      }
+      // 收集后续兄弟元素直到下一个 section title
+      const siblings = [];
+      let next = title.nextElementSibling;
+      while (next && !next.classList.contains('minimap-settings-section-title') && !next.classList.contains('minimap-settings-footer')) {
+        siblings.push(next);
+        next = next.nextElementSibling;
+      }
+      // 包裹到容器中
+      const wrapper = document.createElement('div');
+      wrapper.className = 'minimap-section-content';
+      siblings.forEach(el => wrapper.appendChild(el));
+      title.parentNode.insertBefore(wrapper, title.nextSibling);
+      // 点击折叠/展开
+      title.addEventListener('click', () => {
+        const isCollapsed = wrapper.style.display === 'none';
+        wrapper.style.display = isCollapsed ? '' : 'none';
+        const arrow = title.querySelector('.collapse-arrow');
+        if (arrow) arrow.style.transform = isCollapsed ? '' : 'rotate(-90deg)';
+      });
+    });
+  }
+
+  applyCounterVisibility() {
+    this.clearHighlights();
+    if (this.currentSelection) {
+      this.highlightMatches();
+    } else {
+      const isReading = this.isReadingMode();
+      if (isReading) {
+        this.showPinnedDecorations();
+      } else {
+        const editor = this.getEditor();
+        if (editor && editor.cm) {
+          this.addEditorDecorationsWithPinned(editor.cm, [], 0);
+        }
+      }
+    }
+  }
+
+  async buildHeadingCache() {
+    const allFiles = this.app.vault.getMarkdownFiles();
+    const newCache = new Map();
+    
+    for (const file of allFiles) {
+      try {
+        const content = await this.app.vault.read(file);
+        const lines = content.split('\n');
+        const headings = [];
+        const tags = [];
+        
+        for (const line of lines) {
+          const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
+          if (headingMatch) {
+            const level = headingMatch[1].length;
+            const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
+            headings.push({ text: headingText, level: level });
+          }
+          
+          const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
+          let tagMatch;
+          while ((tagMatch = tagRegex.exec(line)) !== null) {
+            const tagText = tagMatch[1];
+            if (tagText && !tags.includes(tagText) && !this.isColorCode(tagText)) {
+              tags.push(tagText);
+            }
+          }
+        }
+        
+        newCache.set(file.path, { headings, tags });
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    this.headingCache = newCache;
+    this.headingCacheBuilt = true;
+    await this.saveListData();
+  }
+
+  isColorCode(text) {
+    if (/^[a-fA-F0-9]{6}$/.test(text)) return true;
+    if (/^[a-fA-F0-9]{8}$/.test(text)) return true;
+    if (/^[a-fA-F0-9]{3,4}$/.test(text)) return true;
+    return false;
+  }
+
+  updateHeadingCacheForFile(file) {
+    this.app.vault.read(file).then(content => {
+      const lines = content.split('\n');
+      const headings = [];
+      const tags = [];
+      
+      for (const line of lines) {
+        const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
+        if (headingMatch) {
+          const level = headingMatch[1].length;
+          const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
+          headings.push({ text: headingText, level: level });
+        }
+        
+        const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
+        let tagMatch;
+        while ((tagMatch = tagRegex.exec(line)) !== null) {
+          const tagText = tagMatch[1];
+          if (tagText && !tags.includes(tagText) && !this.isColorCode(tagText)) {
+            tags.push(tagText);
+          }
+        }
+      }
+      
+      this.headingCache.set(file.path, { headings, tags });
+      this.saveListData();
+    }).catch(() => {});
+  }
+
+  showSettingsPanel(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (this.settingsPanel) {
+      this.closeSettingsPanel();
+      return;
+    }
+    
+    this.settingsPanel = document.createElement('div');
+    this.settingsPanel.className = 'minimap-settings-panel';
+    this.settingsPanel.innerHTML = `
+      <div class="minimap-settings-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="minimap-lang-toggle" style="display:inline-block;padding:1px 8px;border-radius:3px;font-size:12px;font-weight:500;border:none;cursor:pointer;user-select:none;line-height:1;${this.settings.language === 'zh' ? 'background:#D85A30;' : 'background:#185FA5;'}color:#fff;letter-spacing:${this.settings.language === 'zh' ? '.1em' : '.08em'};">${this.settings.language === 'zh' ? 'CN' : 'EN'}</button>
+          <span>${t('settingsTitle')} v${this.manifest.version || '1.0.0'}</span>
+        </div>
+        <button class="minimap-settings-close">×</button>
+      </div>
+      <div class="minimap-settings-tabs">
+        <div class="minimap-settings-tab active" data-tab="basic">${t('tabBasic')}</div>
+        <div class="minimap-settings-tab" data-tab="counter">${t('tabCounter')}</div>
+        <div class="minimap-settings-tab" data-tab="pinned">${t('tabPinned')}</div>
+      </div>
+      <div class="minimap-settings-content">
+        <div class="minimap-settings-tab-content active" data-tab="basic">
+          <div class="minimap-settings-row">
+            <label>${t('topDistance')}</label>
+            <input type="number" id="minimap-top" value="${this.settings.top}" min="0" max="500">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('width')}</label>
+            <input type="number" id="minimap-width" value="${this.settings.width}" min="1" max="20" step="0.5">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('maxWidth')}</label>
+            <input type="number" id="minimap-maxwidth" value="${this.settings.maxWidth}" min="20" max="200">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('bottomOffset')}</label>
+            <input type="number" id="minimap-heightoffset" value="${this.settings.heightOffset}" min="0" max="200">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('rightOffset')}</label>
+            <input type="number" id="minimap-rightoffset" value="${this.settings.rightOffset}" min="-100" max="200">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('sliderColor')}</label>
+            <input type="color" id="minimap-slidercolor" value="${this.settings.sliderColor}">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('opacity')}</label>
+            <input type="range" id="minimap-opacity" value="${this.settings.opacity}" min="0.1" max="1" step="0.1">
+            <span id="minimap-opacity-value">${this.settings.opacity}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('contentOpacity')}</label>
+            <input type="range" id="minimap-contentopacity" value="${this.settings.contentOpacity}" min="0.1" max="1" step="0.1">
+            <span id="minimap-contentopacity-value">${this.settings.contentOpacity}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('hoverExpand')}</label>
+            <input type="checkbox" id="minimap-collapseonhover" ${this.settings.collapseOnHover ? 'checked' : ''}>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('collapseWidth')}</label>
+            <input type="number" id="minimap-collapsewidth" value="${this.settings.collapseWidth}" min="4" max="50">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('floatingToggleText')}</label>
+            <div class="minimap-settings-row-controls">
+              <input type="text" id="minimap-floatingtoggletext" value="${this.settings.floatingToggleText || 'Swift'}" style="width:80px;text-align:center;">
+              <button class="minimap-floating-toggle-btn" id="minimap-showfloatingtoggle" title="${t('showFloating')}">⚡</button>
+            </div>
+          </div>
+          <div class="minimap-settings-section-title">${t('floatingToggleStyle')}</div>
+          <div class="minimap-settings-row">
+            <label>${t('fontSize')}</label>
+            <input type="number" id="minimap-floatingtogglefontsize" value="${this.settings.floatingToggleFontSize ?? 11}" min="8" max="24">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('paddingH')}</label>
+            <input type="number" id="minimap-floatingtogglepaddingh" value="${this.settings.floatingTogglePaddingH ?? 10}" min="2" max="30">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('paddingV')}</label>
+            <input type="number" id="minimap-floatingtogglepaddingv" value="${this.settings.floatingTogglePaddingV ?? 2}" min="0" max="15">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('opacity')}</label>
+            <input type="range" id="minimap-floatingtoggleopacity" value="${this.settings.floatingToggleOpacity ?? 0.6}" min="0.1" max="1" step="0.05">
+            <span id="minimap-floatingtoggleopacity-value">${this.settings.floatingToggleOpacity ?? 0.6}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('hideStatusBar')}</label>
+            <input type="checkbox" id="minimap-hidestatusbar" ${this.settings.hideStatusBar ? 'checked' : ''}>
+          </div>
+          <div class="minimap-settings-section-title">${t('searchLimit')}</div>
+          <div class="minimap-settings-row">
+            <label>${t('minWords')}</label>
+            <input type="number" id="minimap-searchwordcountmin" value="${this.settings.searchWordCountMin ?? 0}" min="0" max="100">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('maxWords')}</label>
+            <input type="number" id="minimap-searchwordcountmax" value="${this.settings.searchWordCountMax ?? 0}" min="0" max="100">
+          </div>
+        </div>
+        <div class="minimap-settings-tab-content" data-tab="counter">
+          <div class="minimap-settings-section-title">${t('pinIcon')}</div>
+          <div class="minimap-settings-row">
+            <label>${t('enablePinIcon')}</label>
+            <input type="checkbox" id="minimap-piniconenabled" ${this.settings.pinIconEnabled ? 'checked' : ''}>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('iconMode')}</label>
+            <select id="minimap-piniconmode">
+              <option value="follow" ${this.settings.pinIconMode === 'follow' ? 'selected' : ''}>${t('followMouse')}</option>
+              <option value="fixed" ${this.settings.pinIconMode === 'fixed' ? 'selected' : ''}>${t('fixedPosition')}</option>
+            </select>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('iconSize')}</label>
+            <input type="number" id="minimap-piniconsize" value="${this.settings.pinIconSize}" min="12" max="40">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('iconOpacity')}</label>
+            <input type="range" id="minimap-piniconopacity" value="${this.settings.pinIconOpacity}" min="0.1" max="1" step="0.1">
+            <span id="minimap-piniconopacity-value">${this.settings.pinIconOpacity}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('iconText')}</label>
+            <input type="text" id="minimap-pinicontext" value="${this.settings.pinIconText || 'm'}" style="width:40px;text-align:center;">
+          </div>
+          <div class="minimap-settings-section-title" style="margin-top:12px;">${t('colorSchemes')}</div>
+          <div class="minimap-settings-row">
+            <label>${t('simplifiedColor')}</label>
+            <input type="checkbox" id="minimap-simplifiedcolorscheme" ${this.settings.simplifiedColorScheme ? 'checked' : ''}>
+          </div>
+          <div id="minimap-color-schemes"></div>
+          <button id="minimap-add-colorscheme" style="width:100%;margin-top:6px;padding:4px 8px;cursor:pointer;">${t('addColor')}</button>
+          <div class="minimap-settings-section-title" style="margin-top:12px;">${t('counterStyle')}</div>
+          <div class="minimap-settings-row">
+            <label>${t('underline')}</label>
+            <input type="number" id="minimap-matchborderwidth" value="${this.settings.matchBorderWidth}" min="1" max="5">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterOpacity')}</label>
+            <input type="range" id="minimap-counteropacity" value="${this.settings.counterOpacity}" min="0.1" max="1" step="0.1">
+            <span id="minimap-counteropacity-value">${this.settings.counterOpacity}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterBgOpacity')}</label>
+            <input type="range" id="minimap-counterbgopacity" value="${this.settings.counterBgOpacity}" min="0.1" max="1" step="0.1">
+            <span id="minimap-counterbgopacity-value">${this.settings.counterBgOpacity}</span>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterFontSize')}</label>
+            <input type="number" id="minimap-countersize" value="${this.settings.counterSize}" min="6" max="16">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterPaddingH')}</label>
+            <input type="number" id="minimap-counterpaddingh" value="${this.settings.counterPaddingH}" min="0" max="10">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterPaddingV')}</label>
+            <input type="number" id="minimap-counterpaddingv" value="${this.settings.counterPaddingV}" min="-10" max="10" step="1">
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('counterTopOffset')}</label>
+            <input type="number" id="minimap-countertopoffset" value="${this.settings.counterTopOffset}" min="-30" max="10">
+          </div>
+        </div>
+        <div class="minimap-settings-tab-content" data-tab="pinned">
+          <div class="minimap-settings-row">
+            <label>${t('clearCountOnClose')}</label>
+            <input type="checkbox" id="minimap-clearcountonclose" ${this.settings.clearCountOnClose ? 'checked' : ''}>
+          </div>
+          <div class="minimap-settings-section-title">${t('pinnedMatches')}</div>
+          <button id="minimap-clearallcounts" style="width:100%;margin-bottom:6px;padding:4px 8px;cursor:pointer;">${t('clearAllCounts')}</button>
+          <div id="minimap-pinned-list" style="max-height:400px;overflow-y:auto;"></div>
+        </div>
+        <div class="minimap-settings-footer">
+          <button id="minimap-reset">${t('resetDefault')}</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(this.settingsPanel);
+    
+    // Restore saved panel width
+    const savedPanelWidth = localStorage.getItem('minimap-settings-panel-width');
+    if (savedPanelWidth) {
+      this.settingsPanel.style.width = savedPanelWidth;
+    }
+    
+    // Save panel width on resize
+    const resizeObserver = new ResizeObserver(() => {
+      const width = this.settingsPanel.getBoundingClientRect().width;
+      localStorage.setItem('minimap-settings-panel-width', `${width}px`);
+    });
+    resizeObserver.observe(this.settingsPanel);
+    this._settingsPanelResizeObserver = resizeObserver;
+    
+    // Center the panel in the window
+    const panelRect = this.settingsPanel.getBoundingClientRect();
+    const centerX = (window.innerWidth - panelRect.width) / 2;
+    const centerY = (window.innerHeight - panelRect.height) / 2;
+    this.settingsPanel.style.left = `${Math.max(0, centerX)}px`;
+    this.settingsPanel.style.top = `${Math.max(0, centerY)}px`;
+    
+    // Make panel draggable by header
+    const header = this.settingsPanel.querySelector('.minimap-settings-header');
+    let isDraggingPanel = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('minimap-settings-close')) return;
+      if (e.target.id === 'minimap-lang-toggle') return;
+      isDraggingPanel = true;
+      dragOffsetX = e.clientX - this.settingsPanel.getBoundingClientRect().left;
+      dragOffsetY = e.clientY - this.settingsPanel.getBoundingClientRect().top;
+      header.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    
+    const onPanelMouseMove = (e) => {
+      if (!isDraggingPanel) return;
+      const newLeft = e.clientX - dragOffsetX;
+      const newTop = e.clientY - dragOffsetY;
+      this.settingsPanel.style.left = `${newLeft}px`;
+      this.settingsPanel.style.top = `${newTop}px`;
+    };
+    
+    const onPanelMouseUp = () => {
+      if (isDraggingPanel) {
+        isDraggingPanel = false;
+        header.style.cursor = 'grab';
+      }
+    };
+    
+    document.addEventListener('mousemove', onPanelMouseMove);
+    document.addEventListener('mouseup', onPanelMouseUp);
+    this._settingsPanelDragCleanup = () => {
+      document.removeEventListener('mousemove', onPanelMouseMove);
+      document.removeEventListener('mouseup', onPanelMouseUp);
+    };
+    
+    const closeBtn = this.settingsPanel.querySelector('.minimap-settings-close');
+    closeBtn.addEventListener('click', () => this.closeSettingsPanel());
+    
+    const langToggle = this.settingsPanel.querySelector('#minimap-lang-toggle');
+    if (langToggle) {
+      langToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.settings.language = this.settings.language === 'zh' ? 'en' : 'zh';
+        window._swiftMatchLang = this.settings.language;
+        this.saveSettings();
+        this.closeSettingsPanel();
+        this.showSettingsPanel({ clientX: parseInt(this.settingsPanel.style.left) || 100, clientY: parseInt(this.settingsPanel.style.top) || 100, preventDefault: () => {}, stopPropagation: () => {} });
+      });
+    }
+    
+    this.settingsPanel.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    
+    this.settingsPanel.querySelectorAll('.minimap-settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.settingsPanel.querySelectorAll('.minimap-settings-tab').forEach(t => t.classList.remove('active'));
+        this.settingsPanel.querySelectorAll('.minimap-settings-tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const tabName = tab.dataset.tab;
+        this.settingsPanel.querySelector(`.minimap-settings-tab-content[data-tab="${tabName}"]`).classList.add('active');
+      });
+    });
+    
+    this.settingsPanel.querySelectorAll('input[type="number"]').forEach(input => {
+      input.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const step = parseFloat(input.step) || 1;
+        const delta = e.deltaY > 0 ? -step : step;
+        const newVal = parseFloat(input.value) + delta;
+        const min = parseFloat(input.min);
+        const max = parseFloat(input.max);
+        if (!isNaN(min) && newVal < min) {
+          input.value = min;
+        } else if (!isNaN(max) && newVal > max) {
+          input.value = max;
+        } else {
+          input.value = newVal;
+        }
+        input.dispatchEvent(new Event('input'));
+      }, { passive: false });
+    });
+
+    this.boundOutsideClick = (e) => {
+      if (!this.settingsPanel.contains(e.target)) {
+        updateSettings();
+        this.closeSettingsPanel();
+      }
+    };
+    document.addEventListener('mousedown', this.boundOutsideClick);
+    
+    const inputs = {
+      top: this.settingsPanel.querySelector('#minimap-top'),
+      width: this.settingsPanel.querySelector('#minimap-width'),
+      maxwidth: this.settingsPanel.querySelector('#minimap-maxwidth'),
+      heightoffset: this.settingsPanel.querySelector('#minimap-heightoffset'),
+      rightoffset: this.settingsPanel.querySelector('#minimap-rightoffset'),
+      slidercolor: this.settingsPanel.querySelector('#minimap-slidercolor'),
+      opacity: this.settingsPanel.querySelector('#minimap-opacity'),
+      contentopacity: this.settingsPanel.querySelector('#minimap-contentopacity'),
+      collapseonhover: this.settingsPanel.querySelector('#minimap-collapseonhover'),
+      collapsewidth: this.settingsPanel.querySelector('#minimap-collapsewidth'),
+      matchborderwidth: this.settingsPanel.querySelector('#minimap-matchborderwidth'),
+      counteropacity: this.settingsPanel.querySelector('#minimap-counteropacity'),
+      counterbgopacity: this.settingsPanel.querySelector('#minimap-counterbgopacity'),
+      countersize: this.settingsPanel.querySelector('#minimap-countersize'),
+      counterpaddingh: this.settingsPanel.querySelector('#minimap-counterpaddingh'),
+      counterpaddingv: this.settingsPanel.querySelector('#minimap-counterpaddingv'),
+      countertopoffset: this.settingsPanel.querySelector('#minimap-countertopoffset'),
+      floatingtoggletext: this.settingsPanel.querySelector('#minimap-floatingtoggletext'),
+      floatingtogglefontsize: this.settingsPanel.querySelector('#minimap-floatingtogglefontsize'),
+      floatingtogglepaddingh: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingh'),
+      floatingtogglepaddingv: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingv'),
+      floatingtoggleopacity: this.settingsPanel.querySelector('#minimap-floatingtoggleopacity'),
+      clearcountonclose: this.settingsPanel.querySelector('#minimap-clearcountonclose'),
+      hidestatusbar: this.settingsPanel.querySelector('#minimap-hidestatusbar'),
+      piniconenabled: this.settingsPanel.querySelector('#minimap-piniconenabled'),
+      piniconmode: this.settingsPanel.querySelector('#minimap-piniconmode'),
+      piniconsize: this.settingsPanel.querySelector('#minimap-piniconsize'),
+      piniconopacity: this.settingsPanel.querySelector('#minimap-piniconopacity'),
+      pinicontext: this.settingsPanel.querySelector('#minimap-pinicontext'),
+      simplifiedcolorscheme: this.settingsPanel.querySelector('#minimap-simplifiedcolorscheme'),
+      searchwordcountmin: this.settingsPanel.querySelector('#minimap-searchwordcountmin'),
+      searchwordcountmax: this.settingsPanel.querySelector('#minimap-searchwordcountmax')
+    };
+
+    const counterBgOpacityValue = this.settingsPanel.querySelector('#minimap-counterbgopacity-value');
+    
+    const opacityValue = this.settingsPanel.querySelector('#minimap-opacity-value');
+    const contentOpacityValue = this.settingsPanel.querySelector('#minimap-contentopacity-value');
+    const counterOpacityValue = this.settingsPanel.querySelector('#minimap-counteropacity-value');
+    const pinIconOpacityValue = this.settingsPanel.querySelector('#minimap-piniconopacity-value');
+    const floatingToggleOpacityValue = this.settingsPanel.querySelector('#minimap-floatingtoggleopacity-value');
+    
+    const updateSettings = () => {
+      this.settings.top = parseFloat(inputs.top.value) || DEFAULT_SETTINGS.top;
+      this.settings.width = parseFloat(inputs.width.value) || DEFAULT_SETTINGS.width;
+      this.settings.maxWidth = parseFloat(inputs.maxwidth.value) || DEFAULT_SETTINGS.maxWidth;
+      this.settings.heightOffset = parseFloat(inputs.heightoffset.value) || DEFAULT_SETTINGS.heightOffset;
+      this.settings.rightOffset = parseFloat(inputs.rightoffset.value) || DEFAULT_SETTINGS.rightOffset;
+      this.settings.sliderColor = inputs.slidercolor.value;
+      this.settings.opacity = parseFloat(inputs.opacity.value) || DEFAULT_SETTINGS.opacity;
+      this.settings.contentOpacity = parseFloat(inputs.contentopacity.value) || DEFAULT_SETTINGS.contentOpacity;
+      this.settings.collapseOnHover = inputs.collapseonhover.checked;
+      this.settings.collapseWidth = parseFloat(inputs.collapsewidth.value) || DEFAULT_SETTINGS.collapseWidth;
+      this.settings.matchBorderWidth = parseFloat(inputs.matchborderwidth.value) || DEFAULT_SETTINGS.matchBorderWidth;
+      this.settings.counterOpacity = parseFloat(inputs.counteropacity.value) || DEFAULT_SETTINGS.counterOpacity;
+      this.settings.counterBgOpacity = parseFloat(inputs.counterbgopacity.value) || DEFAULT_SETTINGS.counterBgOpacity;
+      this.settings.counterSize = parseFloat(inputs.countersize.value) || DEFAULT_SETTINGS.counterSize;
+      this.settings.counterPaddingH = parseFloat(inputs.counterpaddingh.value) || DEFAULT_SETTINGS.counterPaddingH;
+      this.settings.counterPaddingV = isNaN(parseFloat(inputs.counterpaddingv.value)) ? DEFAULT_SETTINGS.counterPaddingV : parseFloat(inputs.counterpaddingv.value);
+      this.settings.counterTopOffset = isNaN(parseFloat(inputs.countertopoffset.value)) ? DEFAULT_SETTINGS.counterTopOffset : parseFloat(inputs.countertopoffset.value);
+      this.settings.floatingToggleText = inputs.floatingtoggletext.value || 'Swift';
+      this.settings.floatingToggleFontSize = parseFloat(inputs.floatingtogglefontsize.value) || DEFAULT_SETTINGS.floatingToggleFontSize;
+      this.settings.floatingTogglePaddingH = parseFloat(inputs.floatingtogglepaddingh.value) || DEFAULT_SETTINGS.floatingTogglePaddingH;
+      this.settings.floatingTogglePaddingV = parseFloat(inputs.floatingtogglepaddingv.value) ?? DEFAULT_SETTINGS.floatingTogglePaddingV;
+      this.settings.floatingToggleOpacity = parseFloat(inputs.floatingtoggleopacity.value) || DEFAULT_SETTINGS.floatingToggleOpacity;
+      this.settings.clearCountOnClose = inputs.clearcountonclose.checked;
+      this.settings.hideStatusBar = inputs.hidestatusbar.checked;
+      this.settings.searchWordCountMin = parseInt(inputs.searchwordcountmin.value) || 0;
+      this.settings.searchWordCountMax = parseInt(inputs.searchwordcountmax.value) || 0;
+      this.settings.pinIconEnabled = inputs.piniconenabled.checked;
+      this.settings.pinIconMode = inputs.piniconmode.value;
+      this.settings.pinIconSize = parseFloat(inputs.piniconsize.value) || DEFAULT_SETTINGS.pinIconSize;
+      this.settings.pinIconOpacity = parseFloat(inputs.piniconopacity.value) || DEFAULT_SETTINGS.pinIconOpacity;
+      this.settings.pinIconText = inputs.pinicontext.value || DEFAULT_SETTINGS.pinIconText;
+      this.settings.simplifiedColorScheme = inputs.simplifiedcolorscheme.checked;
+      opacityValue.textContent = this.settings.opacity.toFixed(1);
+      contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
+      counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
+      counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
+      pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
+      floatingToggleOpacityValue.textContent = this.settings.floatingToggleOpacity.toFixed(2);
+      this.saveSettings();
+      this.applySettings();
+      this.applyCounterStyles();
+      this.updateFloatingToggleStyle();
+      renderColorSchemes();
+      if (this.currentSelection) this.highlightMatches();
+    };
+    
+    Object.values(inputs).forEach(input => {
+      input.addEventListener('input', updateSettings);
+    });
+    
+    const resetBtn = this.settingsPanel.querySelector('#minimap-reset');
+    resetBtn.addEventListener('click', () => {
+      this.settings = Object.assign({}, DEFAULT_SETTINGS);
+      inputs.top.value = this.settings.top;
+      inputs.width.value = this.settings.width;
+      inputs.maxwidth.value = this.settings.maxWidth;
+      inputs.heightoffset.value = this.settings.heightOffset;
+      inputs.rightoffset.value = this.settings.rightOffset;
+      inputs.slidercolor.value = this.settings.sliderColor;
+      inputs.opacity.value = this.settings.opacity;
+      inputs.contentopacity.value = this.settings.contentOpacity;
+      inputs.collapseonhover.checked = this.settings.collapseOnHover;
+      inputs.collapsewidth.value = this.settings.collapseWidth;
+      inputs.matchborderwidth.value = this.settings.matchBorderWidth;
+      inputs.counteropacity.value = this.settings.counterOpacity;
+      inputs.counterbgopacity.value = this.settings.counterBgOpacity;
+      inputs.countersize.value = this.settings.counterSize;
+      inputs.counterpaddingh.value = this.settings.counterPaddingH;
+      inputs.counterpaddingv.value = this.settings.counterPaddingV;
+      inputs.countertopoffset.value = this.settings.counterTopOffset;
+      inputs.floatingtoggletext.value = this.settings.floatingToggleText || 'Swift';
+      inputs.floatingtogglefontsize.value = this.settings.floatingToggleFontSize;
+      inputs.floatingtogglepaddingh.value = this.settings.floatingTogglePaddingH;
+      inputs.floatingtogglepaddingv.value = this.settings.floatingTogglePaddingV;
+      inputs.floatingtoggleopacity.value = this.settings.floatingToggleOpacity;
+      inputs.clearcountonclose.checked = this.settings.clearCountOnClose;
+      inputs.hidestatusbar.checked = this.settings.hideStatusBar;
+      inputs.piniconenabled.checked = this.settings.pinIconEnabled;
+      inputs.piniconmode.value = this.settings.pinIconMode;
+      inputs.piniconsize.value = this.settings.pinIconSize;
+      inputs.piniconopacity.value = this.settings.pinIconOpacity;
+      inputs.pinicontext.value = this.settings.pinIconText || 'm';
+      inputs.simplifiedcolorscheme.checked = this.settings.simplifiedColorScheme;
+      inputs.searchwordcountmin.value = this.settings.searchWordCountMin ?? 0;
+      inputs.searchwordcountmax.value = this.settings.searchWordCountMax ?? 0;
+      opacityValue.textContent = this.settings.opacity.toFixed(1);
+      contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
+      counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
+      counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
+      pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
+      floatingToggleOpacityValue.textContent = this.settings.floatingToggleOpacity.toFixed(2);
+      this.saveSettings();
+      this.applySettings();
+      renderColorSchemes();
+      renderPinnedList();
+    });
+    
+
+    const floatingToggleBtn = this.settingsPanel.querySelector('#minimap-showfloatingtoggle');
+    floatingToggleBtn.addEventListener('click', () => {
+      this.createFloatingToggle();
+      this.closeSettingsPanel();
+    });
+
+    // Render color schemes
+    const colorSchemesContainer = this.settingsPanel.querySelector('#minimap-color-schemes');
+    const renderColorSchemes = () => {
+      colorSchemesContainer.innerHTML = '';
+      const schemes = this.settings.pinColorSchemes || [];
+      const simplified = this.settings.simplifiedColorScheme;
+      if (simplified) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:4px 0;';
+        schemes.forEach((scheme, index) => {
+          const input = document.createElement('input');
+          input.type = 'color';
+          input.value = scheme.counterColor;
+          input.dataset.schemeIndex = index;
+          input.dataset.schemeField = 'counterColor';
+          input.style.cssText = 'width:28px;height:22px;padding:0;flex-shrink:0;';
+          row.appendChild(input);
+        });
+        colorSchemesContainer.appendChild(row);
+      } else {
+        schemes.forEach((scheme, index) => {
+          const row = document.createElement('div');
+          row.className = 'minimap-settings-row';
+          row.style.alignItems = 'center';
+          row.style.gap = '6px';
+          row.style.flexWrap = 'nowrap';
+          row.innerHTML = `
+            <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${index + 1}</span>
+            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('border')}</label><input type="color" value="${scheme.borderColor}" data-scheme-index="${index}" data-scheme-field="borderColor" style="width:28px;height:22px;padding:0;"></span>
+            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('background')}</label><input type="color" value="${scheme.counterBgColor}" data-scheme-index="${index}" data-scheme-field="counterBgColor" style="width:28px;height:22px;padding:0;"></span>
+            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('text')}</label><input type="color" value="${scheme.counterColor}" data-scheme-index="${index}" data-scheme-field="counterColor" style="width:28px;height:22px;padding:0;"></span>
+            <button data-scheme-delete="${index}" style="font-size:12px;padding:0 4px;cursor:pointer;color:var(--text-muted);flex-shrink:0;">×</button>
+          `;
+          colorSchemesContainer.appendChild(row);
+        });
+      }
+
+      // Bind color change events
+      colorSchemesContainer.querySelectorAll('input[type="color"]').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.schemeIndex);
+          const field = e.target.dataset.schemeField;
+          this.settings.pinColorSchemes[idx][field] = e.target.value;
+          // 简化模式下，修改文字色时同步边框色和背景色
+          if (simplified && field === 'counterColor') {
+            this.settings.pinColorSchemes[idx].borderColor = e.target.value;
+            this.settings.pinColorSchemes[idx].counterBgColor = e.target.value;
+          }
+          this.saveSettings();
+        });
+      });
+
+      // Bind delete events (non-simplified only)
+      colorSchemesContainer.querySelectorAll('button[data-scheme-delete]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.dataset.schemeDelete);
+          this.settings.pinColorSchemes.splice(idx, 1);
+          this.saveSettings();
+          renderColorSchemes();
+        });
+      });
+    };
+
+    // Add color scheme button
+    const addColorSchemeBtn = this.settingsPanel.querySelector('#minimap-add-colorscheme');
+    addColorSchemeBtn.addEventListener('click', () => {
+      const colors = ['#f44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#FF5722', '#795548'];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      this.settings.pinColorSchemes.push({
+        borderColor: randomColor,
+        counterBgColor: randomColor,
+        counterColor: '#ffffff'
+      });
+      this.saveSettings();
+      renderColorSchemes();
+    });
+
+    // Render pinned list
+    const pinnedListContainer = this.settingsPanel.querySelector('#minimap-pinned-list');
+    const renderPinnedList = () => {
+      pinnedListContainer.innerHTML = '';
+      const pinnedItems = this.savedMatchLists.filter(m => m.pinned);
+      if (pinnedItems.length === 0) {
+        pinnedListContainer.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px;">${t('noPinned')}</div>`;
+        return;
+      }
+      // Group by file name
+      const fileGroups = new Map();
+      pinnedItems.forEach(item => {
+        const fileName = item.fileName || t('unknownFile');
+        if (!fileGroups.has(fileName)) {
+          fileGroups.set(fileName, []);
+        }
+        fileGroups.get(fileName).push(item);
+      });
+      fileGroups.forEach((items, fileName) => {
+        const groupHeader = document.createElement('div');
+        groupHeader.style.cssText = 'font-size:11px;color:var(--text-muted);padding:4px 0 2px;font-weight:600;display:flex;align-items:center;gap:6px;';
+        const headerSpan = document.createElement('span');
+        headerSpan.style.cssText = 'flex:1;';
+        headerSpan.textContent = fileName;
+        const clearBtn = document.createElement('button');
+        clearBtn.style.cssText = 'font-size:10px;padding:0 4px;cursor:pointer;color:var(--text-muted);flex-shrink:0;';
+        clearBtn.title = t('clearDocPinned');
+        clearBtn.textContent = t('clear');
+        clearBtn.addEventListener('click', () => {
+          this.savedMatchLists = this.savedMatchLists.filter(item => !(item.fileName === fileName && item.pinned));
+          this.saveListData();
+          this.clearHighlights();
+          this.showPinnedDecorations();
+          if (this.currentSelection) {
+            this.highlightMatches();
+          }
+          renderPinnedList();
+        });
+        groupHeader.appendChild(headerSpan);
+        groupHeader.appendChild(clearBtn);
+        pinnedListContainer.appendChild(groupHeader);
+        items.forEach(item => {
+          const colorScheme = this.getPinnedColorScheme(item);
+          const row = document.createElement('div');
+          row.className = 'minimap-settings-row';
+          row.style.alignItems = 'center';
+          row.style.gap = '6px';
+          row.style.padding = '4px 0 4px 12px';
+          const colorDot = document.createElement('span');
+          colorDot.style.cssText = `width:12px;height:12px;border-radius:2px;background:${colorScheme.borderColor};flex-shrink:0;`;
+          const label = document.createElement('span');
+          label.style.cssText = 'flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+          label.title = item.selection;
+          label.textContent = item.selection;
+          const removeBtn = document.createElement('button');
+          removeBtn.style.cssText = 'font-size:11px;padding:0 4px;cursor:pointer;color:var(--text-muted);';
+          removeBtn.title = t('remove');
+          removeBtn.textContent = '×';
+          removeBtn.addEventListener('click', () => {
+            this.removePinnedSelection(item.selection);
+            renderPinnedList();
+          });
+          row.appendChild(colorDot);
+          row.appendChild(label);
+          row.appendChild(removeBtn);
+          pinnedListContainer.appendChild(row);
+        });
+      });
+    };
+
+    // Bind clear all counts button
+    const clearAllCountsBtn = this.settingsPanel.querySelector('#minimap-clearallcounts');
+    if (clearAllCountsBtn) {
+      clearAllCountsBtn.addEventListener('click', () => {
+        this.savedMatchLists = this.savedMatchLists.filter(item => !item.pinned);
+        this.saveListData();
+        this.clearHighlights();
+        if (this.currentSelection) {
+          this.highlightMatches();
+        }
+        renderPinnedList();
+      });
+    }
+
+    renderColorSchemes();
+    renderPinnedList();
+
+    // 初始化折叠功能
+    this.initCollapsibleSections();
+    
+    setTimeout(() => {
+      document.addEventListener('click', this.handleOutsideClick.bind(this), { once: true });
+    }, 10);
+  }
+
+  handleOutsideClick(e) {
+    if (this.settingsPanel && !this.settingsPanel.contains(e.target)) {
+      this.closeSettingsPanel();
+    }
+  }
+
+  closeSettingsPanel() {
+    if (this._settingsPanelResizeObserver) {
+      this._settingsPanelResizeObserver.disconnect();
+      this._settingsPanelResizeObserver = null;
+    }
+    if (this._settingsPanelDragCleanup) {
+      this._settingsPanelDragCleanup();
+      this._settingsPanelDragCleanup = null;
+    }
+    if (this.boundOutsideClick) {
+      document.removeEventListener('mousedown', this.boundOutsideClick);
+      this.boundOutsideClick = null;
+    }
+    if (this.settingsPanel) {
+      this.settingsPanel.remove();
+      this.settingsPanel = null;
+    }
+  }
+
+  createFloatingToggle() {
+    if (this.floatingToggle) {
+      if (this.floatingToggleWrapper) {
+        this.floatingToggleWrapper.remove();
+        this.floatingToggleWrapper = null;
+      }
+      this.floatingToggle = null;
+      this.floatingToggleText = null;
+      this.floatingSearchBox = null;
+      this.settings.floatingToggleVisible = false;
+      this.saveSettings();
+      return;
+    }
+
+    const size = this.settings.floatingToggleSize || 20;
+    const opacity = this.settings.floatingToggleOpacity || 0.6;
+    const fontSize = this.settings.floatingToggleFontSize || Math.max(10, size * 0.55);
+    const paddingH = this.settings.floatingTogglePaddingH ?? 10;
+    const paddingV = this.settings.floatingTogglePaddingV ?? 2;
+    
+    // Create wrapper container for toggle + search box
+    this.floatingToggleWrapper = document.createElement('div');
+    this.floatingToggleWrapper.className = 'minimap-floating-toggle-wrapper';
+    const isRightSide = !!this.settings.floatingToggleRight;
+    this.floatingToggleWrapper.style.cssText = `
+      position: fixed;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      user-select: none;
+      ${isRightSide 
+        ? `right: ${this.settings.floatingToggleRight}px; left: auto;` 
+        : `left: ${this.settings.floatingToggleX || 50}px; right: auto;`}
+      top: ${this.settings.floatingToggleY || 100}px;
+    `;
+    
+    // Search box - absolutely positioned so it doesn't affect toggle position
+    this.floatingSearchBox = document.createElement('input');
+    this.floatingSearchBox.className = 'minimap-floating-search-box';
+    this.floatingSearchBox.type = 'text';
+    this.floatingSearchBox.placeholder = t('searchPlaceholder');
+    this.floatingSearchBox.style.cssText = `
+      position: absolute;
+      ${isRightSide ? 'right' : 'left'}: 100%;
+      top: 0;
+      width: 0;
+      height: ${size}px;
+      border: none;
+      border-radius: ${size / 2}px;
+      background: var(--background-secondary);
+      color: var(--text-normal);
+      font-size: 12px;
+      padding: 0;
+      outline: none;
+      opacity: 0;
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      ${isRightSide ? 'margin-right: 4px;' : 'margin-left: 4px;'}
+    `;
+    this.floatingSearchBox.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+    this.floatingSearchBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = this.floatingSearchBox.value.trim();
+        if (query) {
+          this.currentSelection = query;
+          this.highlightMatches();
+        }
+      } else if (e.key === 'Escape') {
+        this.floatingSearchBox.value = '';
+        this.floatingSearchBox.blur();
+        this.collapseFloatingSearchBox();
+      }
+    });
+    this.floatingSearchBox.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (this.floatingToggleWrapper && !this.floatingToggleWrapper.matches(':hover')) {
+          this.collapseFloatingSearchBox();
+        }
+      }, 100);
+    });
+    this.floatingToggleWrapper.appendChild(this.floatingSearchBox);
+    
+    // Toggle button - wrapper for background
+    this.floatingToggle = document.createElement('div');
+    this.floatingToggle.className = 'minimap-floating-toggle';
+    this.floatingToggle.style.cssText = `
+      position: relative;
+      padding: ${paddingV}px ${paddingH}px;
+      border-radius: 9999px;
+      background-color: rgba(240, 100, 120, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      flex-shrink: 0;
+      opacity: ${opacity};
+      transition: transform 0.15s ease, opacity 0.2s ease;
+    `;
+    
+    // Inner text element with gradient
+    this.floatingToggleText = document.createElement('span');
+    this.floatingToggleText.className = 'swift';
+    const toggleText = this.settings.floatingToggleText || 'Swift';
+    this.floatingToggleText.style.cssText = `
+      font-weight: 800;
+      background: linear-gradient(135deg, #f2709c, #ff9472, #f5af19, #f2709c);
+      background-size: 250% 100%;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 6px rgba(240, 100, 120, 0.7)) drop-shadow(0 0 12px rgba(245, 150, 50, 0.5));
+      animation: hp-twilight-move 3.5s linear infinite;
+      font-size: ${fontSize}px;
+      white-space: nowrap;
+      line-height: 1;
+      padding: 0;
+      ${!this.settings.enableSelectionMatch ? 'text-decoration: line-through; text-decoration-color: rgba(240, 100, 120, 0.7);' : ''}
+    `;
+    this.floatingToggleText.textContent = toggleText;
+    this.floatingToggle.appendChild(this.floatingToggleText);
+
+    // Inject keyframes if not already present
+    if (!document.getElementById('swift-match-twilight-keyframes')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'swift-match-twilight-keyframes';
+      styleEl.textContent = `@keyframes hp-twilight-move { 0% { background-position: 0% 50%; } 100% { background-position: 250% 50%; } }`;
+      document.head.appendChild(styleEl);
+    }
+
+    this.settings.floatingToggleVisible = true;
+    this.saveSettings();
+
+    this.updateFloatingToggleStyle();
+
+    this.floatingToggleWrapper.addEventListener('mouseenter', () => {
+      this.floatingToggle.style.opacity = '1';
+      this.expandFloatingSearchBox();
+
+      this._floatingToggleHoverTimer = setTimeout(() => {
+        this._listUserDismissed = false;
+        this._listTriggerElement = this.floatingToggleWrapper || null;
+        const hasCachedMatches = (this.settings.enableSelectionMatch && this._cachedMatchList && this._pendingSearchText) ||
+          (this._listPinnedSearchText && this._pinnedWordFileMap);
+        if (hasCachedMatches) {
+          if (this._listPinnedSearchText && this._pinnedWordFileMap) {
+            this._pendingShowList = { searchText: this._listPinnedSearchText, matchCount: this._pinnedWordMatchCount || 0 };
+            this.renderMatchList(this._pinnedWordFileMap, this._pinnedWordMatchCount || 0, false);
+            this._listShownFromHover = true;
+            this.positionListNearFloatingToggle();
+          } else {
+            this.showMatchListFromFloatingToggle();
+          }
+        } else if (this._recentSearches.length > 0) {
+          const recentTerm = this._recentSearches[0];
+          const cached = this._recentSearchCaches[recentTerm];
+          if (cached && cached.fileMap && cached.fileMap.size > 0) {
+            this._pendingShowList = { searchText: recentTerm, matchCount: cached.matchCount };
+            this._cachedMatchList = cached.fileMap;
+            this._cachedMatchListKey = recentTerm;
+            this._pendingMatchCount = cached.matchCount;
+            this._pendingSearchText = recentTerm;
+            this.renderMatchList(cached.fileMap, cached.matchCount, false);
+            this._listShownFromHover = true;
+            this.positionListNearFloatingToggle();
+          } else {
+            this.showRecentSearchList();
+          }
+        }
+      }, 200);
+    });
+
+    this.floatingToggleWrapper.addEventListener('mouseleave', () => {
+      const op = this.settings.floatingToggleOpacity || 0.6;
+      this.floatingToggle.style.opacity = op.toString();
+      this.collapseFloatingSearchBox();
+
+      if (this._floatingToggleHoverTimer) {
+        clearTimeout(this._floatingToggleHoverTimer);
+        this._floatingToggleHoverTimer = null;
+      }
+      if (this._isListVisible && this._listShownFromHover) {
+        setTimeout(() => {
+          const keywordBtnHovered = this._floatingKeywordButtons.some(b => b.wrapper.matches(':hover'));
+          if (this.matchList && !this.matchList.matches(':hover') && !this.floatingToggleWrapper.matches(':hover') && !keywordBtnHovered) {
+            this.hideMatchList();
+            this._listShownFromHover = false;
+          }
+        }, 100);
+      }
+      if (this._isListVisible && !this.isPreviewOpen) {
+        setTimeout(() => {
+          const listHovered = this.matchList && this.matchList.matches(':hover');
+          const toggleWrapperHovered = this.floatingToggleWrapper && this.floatingToggleWrapper.matches(':hover');
+          const keywordBtnHovered = this._floatingKeywordButtons.some(b => b.wrapper.matches(':hover'));
+          if (!listHovered && !toggleWrapperHovered && !keywordBtnHovered) {
+            this.hideMatchList();
+            this._listShownFromHover = false;
+          }
+        }, 300);
+      }
+    });
+
+    this.floatingToggle.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      
+      const rect = this.floatingToggleWrapper.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startLeft = rect.left;
+      const startTop = rect.top;
+      const currentWidth = rect.width;
+      
+      this.floatingToggle.style.cursor = 'grabbing';
+      this.floatingToggle.style.transform = 'scale(1.1)';
+      
+      const handleMouseMove = (moveEvent) => {
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
+        
+        let newLeft = startLeft + deltaX;
+        let newTop = startTop + deltaY;
+        
+        newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - currentWidth));
+        newTop = Math.max(0, Math.min(newTop, window.innerHeight - 30));
+        
+        this.floatingToggleWrapper.style.left = `${newLeft}px`;
+        this.floatingToggleWrapper.style.right = 'auto';
+        this.floatingToggleWrapper.style.top = `${newTop}px`;
+
+        // Move match list with the toggle if it's visible and triggered by toggle
+        if (this._isListVisible && this._listTriggerElement === this.floatingToggleWrapper) {
+          this.positionListNearFloatingToggle();
+        }
+      };
+      
+      const handleMouseUp = (upEvent) => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        
+        this.floatingToggle.style.cursor = 'pointer';
+        this.floatingToggle.style.transform = 'scale(1)';
+        
+        const deltaX = Math.abs(upEvent.clientX - startX);
+        const deltaY = Math.abs(upEvent.clientY - startY);
+        
+        if (deltaX < 5 && deltaY < 5) {
+          this.settings.enableSelectionMatch = !this.settings.enableSelectionMatch;
+          this.saveSettings();
+          this.updateFloatingToggleStyle();
+          if (this.currentSelection) {
+            if (this.settings.enableSelectionMatch) {
+              // Re-enable: re-run highlights which will trigger showMatchList
+              this.highlightMatches();
+            } else {
+              // Disable: only clear cross-file search results, keep in-doc highlights
+              this.hideMatchList();
+              this.updateFloatingToggleBadge(0, 0);
+            }
+          }
+        }
+        
+        const wrapperRect = this.floatingToggleWrapper.getBoundingClientRect();
+        const toggleCenterX = wrapperRect.left + wrapperRect.width / 2;
+        const isRightSide = toggleCenterX > window.innerWidth / 2;
+        
+        if (isRightSide) {
+          const rightVal = window.innerWidth - wrapperRect.right;
+          this.floatingToggleWrapper.style.right = `${rightVal}px`;
+          this.floatingToggleWrapper.style.left = 'auto';
+          this.settings.floatingToggleRight = rightVal;
+          delete this.settings.floatingToggleX;
+        } else {
+          this.settings.floatingToggleX = parseInt(this.floatingToggleWrapper.style.left);
+          delete this.settings.floatingToggleRight;
+        }
+        this.settings.floatingToggleY = parseInt(this.floatingToggleWrapper.style.top);
+        this.saveSettings();
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+
+    this.floatingToggle.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const mockEvent = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      };
+      this.showSettingsPanel(mockEvent);
+    });
+
+    this.floatingToggle.addEventListener('wheel', (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        
+        const delta = e.deltaY > 0 ? -1 : 1;
+        let newSize = (this.settings.floatingToggleSize || 20) + delta;
+        newSize = Math.max(10, Math.min(40, newSize));
+        
+        this.settings.floatingToggleSize = newSize;
+        if (this.floatingToggleText) {
+          this.floatingToggleText.style.fontSize = `${Math.max(10, newSize * 0.55)}px`;
+          this.settings.floatingToggleFontSize = Math.max(10, newSize * 0.55);
+        }
+        this.saveSettings();
+      } else if (e.altKey) {
+        e.preventDefault();
+        
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        let newOpacity = (this.settings.floatingToggleOpacity || 0.6) + delta;
+        newOpacity = Math.max(0.1, Math.min(1, newOpacity));
+        
+        this.settings.floatingToggleOpacity = newOpacity;
+        this.floatingToggle.style.opacity = newOpacity.toString();
+        this.saveSettings();
+      }
+    }, { passive: false });
+
+    this.floatingToggle.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      this.floatingToggle.remove();
+      this.floatingToggle = null;
+      this.floatingToggleText = null;
+      this.settings.floatingToggleVisible = false;
+      this.saveSettings();
+    });
+
+    this.floatingToggleWrapper.appendChild(this.floatingToggle);
+    document.body.appendChild(this.floatingToggleWrapper);
+  }
+
+  updateFloatingToggleStyle() {
+    if (!this.floatingToggle) return;
+    const textEl = this.floatingToggleText;
+    if (!textEl) return;
+    const toggleText = this.settings.floatingToggleText || 'Swift';
+    textEl.textContent = toggleText;
+
+    // Apply font size, padding from settings
+    const fontSize = this.settings.floatingToggleFontSize || 11;
+    const paddingH = this.settings.floatingTogglePaddingH ?? 10;
+    const paddingV = this.settings.floatingTogglePaddingV ?? 2;
+    const opacity = this.settings.floatingToggleOpacity ?? 0.6;
+
+    textEl.style.fontSize = `${fontSize}px`;
+    this.floatingToggle.style.padding = `${paddingV}px ${paddingH}px`;
+    this.floatingToggle.style.opacity = opacity.toString();
+    
+    if (!this.settings.enableSelectionMatch) {
+      textEl.style.textDecoration = 'line-through';
+      textEl.style.textDecorationColor = 'rgba(240, 100, 120, 0.7)';
+    } else {
+      textEl.style.textDecoration = 'none';
+      textEl.style.textDecorationColor = '';
+    }
+    
+    // Update badge visibility based on enableSelectionMatch
+    if (!this.settings.enableSelectionMatch) {
+      this._listShownFromHover = false;
+      // Reset to text when search is disabled
+      const toggleText = this.settings.floatingToggleText || 'Swift';
+      textEl.textContent = toggleText;
+    } else if (this._cachedMatchList && this._cachedMatchList.size > 0) {
+      this.updateFloatingToggleBadge(this._cachedMatchList.size, this._pendingMatchCount || 0);
+    }
+  }
+
+  createFloatingKeywordButton(keyword, fileMap, matchCount) {
+    // Remove existing button for the same keyword
+    this.removeFloatingKeywordButton(keyword);
+
+    // Cache search results
+    if (fileMap && fileMap.size > 0) {
+      this._recentSearchCaches[keyword] = { fileMap, matchCount };
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'swift-match-keyword-btn-wrapper';
+    wrapper.style.cssText = `
+      position: fixed;
+      z-index: 99998;
+      display: flex;
+      align-items: center;
+      user-select: none;
+      left: 50px;
+      top: ${100 + this._floatingKeywordButtons.length * 36}px;
+    `;
+
+    const btn = document.createElement('div');
+    btn.className = 'swift-match-keyword-btn';
+    btn.style.cssText = `
+      position: relative;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      background-color: rgba(240, 100, 120, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05);
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      opacity: 0.7;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+    `;
+
+    const textEl = document.createElement('span');
+    const displayText = keyword.length > 12 ? keyword.substring(0, 12) + '…' : keyword;
+    textEl.style.cssText = `
+      font-weight: 800;
+      background: linear-gradient(135deg, #f2709c, #ff9472, #f5af19, #f2709c);
+      background-size: 250% 100%;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 6px rgba(240, 100, 120, 0.7)) drop-shadow(0 0 12px rgba(245, 150, 50, 0.5));
+      animation: hp-twilight-move 3.5s linear infinite;
+      font-size: 11px;
+      white-space: nowrap;
+      line-height: 1;
+      padding: 0;
+    `;
+    textEl.textContent = displayText;
+    btn.appendChild(textEl);
+    wrapper.appendChild(btn);
+    document.body.appendChild(wrapper);
+
+    const btnData = {
+      wrapper,
+      btn,
+      textEl,
+      term: keyword,
+      fileMap,
+      matchCount,
+      position: { left: 50, top: 100 + this._floatingKeywordButtons.length * 36 }
+    };
+    this._floatingKeywordButtons.push(btnData);
+
+    // Persist floating keyword data
+    this._updateFloatingKeywordsData();
+
+    // Hover: show search window
+    let hoverTimer = null;
+    wrapper.addEventListener('mouseenter', () => {
+      btn.style.opacity = '1';
+      hoverTimer = setTimeout(() => {
+        this._listUserDismissed = false;
+        const cached = this._recentSearchCaches[keyword];
+        if (cached && cached.fileMap && cached.fileMap.size > 0) {
+          this._cachedMatchList = cached.fileMap;
+          this._cachedMatchListKey = keyword;
+          this._pendingMatchCount = cached.matchCount;
+          this._pendingShowList = { searchText: keyword, matchCount: cached.matchCount };
+          this._listTriggerElement = wrapper;
+          this.renderMatchList(cached.fileMap, cached.matchCount, false);
+          this._listShownFromHover = true;
+          this.positionListNearElement(wrapper);
+        }
+      }, 200);
+    });
+
+    wrapper.addEventListener('mouseleave', () => {
+      btn.style.opacity = '0.7';
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+      if (this._isListVisible && this._listShownFromHover) {
+        setTimeout(() => {
+          const listHovered = this.matchList && this.matchList.matches(':hover');
+          const btnHovered = wrapper.matches(':hover');
+          if (!listHovered && !btnHovered) {
+            this.hideMatchList();
+            this._listShownFromHover = false;
+          }
+        }, 100);
+      }
+    });
+
+    // Drag support
+    let isDragging = false;
+    let hasDragged = false;
+    let startX, startY, startLeft, startTop;
+
+    const onDragMove = (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged = true;
+      let newLeft = startLeft + dx;
+      let newTop = startTop + dy;
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - wrapper.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, window.innerHeight - 30));
+      wrapper.style.left = `${newLeft}px`;
+      wrapper.style.top = `${newTop}px`;
+      btnData.position.left = newLeft;
+      btnData.position.top = newTop;
+
+      // Move match list with the keyword button if it's visible and triggered by this button
+      if (this._isListVisible && this._listTriggerElement === wrapper) {
+        this.positionListNearElement(wrapper);
+      }
+    };
+
+    const onDragEnd = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      btn.style.cursor = 'grab';
+      btn.style.transform = '';
+      document.removeEventListener('mousemove', onDragMove);
+      document.removeEventListener('mouseup', onDragEnd);
+    };
+
+    btn.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      isDragging = true;
+      hasDragged = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = wrapper.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+      btn.style.cursor = 'grabbing';
+      btn.style.transform = 'scale(1.05)';
+      document.addEventListener('mousemove', onDragMove);
+      document.addEventListener('mouseup', onDragEnd);
+    });
+
+    // Right-click to remove
+    wrapper.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.removeFloatingKeywordButton(keyword);
+    });
+  }
+
+  removeFloatingKeywordButton(keyword) {
+    const idx = this._floatingKeywordButtons.findIndex(b => b.term === keyword);
+    if (idx >= 0) {
+      const btnData = this._floatingKeywordButtons[idx];
+      if (btnData.wrapper && btnData.wrapper.parentNode) {
+        btnData.wrapper.parentNode.removeChild(btnData.wrapper);
+      }
+      this._floatingKeywordButtons.splice(idx, 1);
+      this._updateFloatingKeywordsData();
+    }
+  }
+
+  _updateFloatingKeywordsData() {
+    this._floatingKeywordsData = this._floatingKeywordButtons.map(btn => ({
+      term: btn.term,
+      position: btn.position || { left: 50, top: 100 },
+      fileMapData: btn.fileMap ? Array.from(btn.fileMap.entries()).map(([file, headings]) => ({
+        path: file.path,
+        basename: file.basename,
+        headings
+      })) : [],
+      matchCount: btn.matchCount || 0
+    }));
+    this.saveListData();
+  }
+
+  async _restoreFloatingKeywordButtons() {
+    if (!this._floatingKeywordsData || this._floatingKeywordsData.length === 0) return;
+    
+    for (const data of this._floatingKeywordsData) {
+      try {
+        let fileMap = null;
+        if (data.fileMapData && data.fileMapData.length > 0) {
+          fileMap = await this.deserializeFileMap(data.fileMapData);
+        }
+        
+        if (fileMap && fileMap.size > 0) {
+          // Cache the restored results
+          this._recentSearchCaches[data.term] = { fileMap, matchCount: data.matchCount || 0 };
+          this.createFloatingKeywordButton(data.term, fileMap, data.matchCount || 0);
+          // Override position with saved position
+          const btnData = this._floatingKeywordButtons.find(b => b.term === data.term);
+          if (btnData && data.position) {
+            btnData.position = data.position;
+            btnData.wrapper.style.left = data.position.left + 'px';
+            btnData.wrapper.style.top = data.position.top + 'px';
+          }
+        }
+      } catch (e) {
+        console.error('Failed to restore floating keyword button:', data.term, e);
+      }
+    }
+  }
+
+  async _restoreRecentSearchCaches() {
+    if (!this._recentSearchCachesData || this._recentSearchCachesData.length === 0) return;
+    for (const data of this._recentSearchCachesData) {
+      try {
+        if (data.fileMapData && data.fileMapData.length > 0) {
+          const fileMap = await this.deserializeFileMap(data.fileMapData);
+          if (fileMap && fileMap.size > 0) {
+            this._recentSearchCaches[data.term] = { fileMap, matchCount: data.matchCount || 0 };
+          }
+        }
+      } catch (e) {
+        console.error('Failed to restore recent search cache:', data.term, e);
+      }
+    }
+  }
+
+  positionListNearElement(el) {
+    if (!this.matchList) return;
+
+    const rect = el.getBoundingClientRect();
+    const listWidth = this.matchListSize.width || this.settings.matchListWidth || 280;
+    const listHeight = this.matchList.offsetHeight || (this.matchListSize.height || this.settings.matchListHeight || 400);
+
+    let left = rect.left;
+    let top = rect.bottom + 5;
+
+    if (left + listWidth > window.innerWidth - 10) {
+      left = window.innerWidth - listWidth - 10;
+    }
+    if (left < 10) left = 10;
+
+    if (top + listHeight > window.innerHeight - 10) {
+      const availableBelow = window.innerHeight - top - 10;
+      const availableAbove = rect.top - 15;
+      if (availableBelow >= 60) {
+        this.matchList.style.maxHeight = `${availableBelow}px`;
+      } else if (availableAbove >= 60) {
+        top = rect.top - Math.min(listHeight, availableAbove) - 5;
+        this.matchList.style.maxHeight = `${Math.min(listHeight, availableAbove)}px`;
+      } else {
+        this.matchList.style.maxHeight = `${Math.max(60, window.innerHeight - 20)}px`;
+        top = 10;
+      }
+    } else {
+      this.matchList.style.maxHeight = '';
+    }
+
+    this.matchList.style.left = `${left}px`;
+    this.matchList.style.top = `${top}px`;
+  }
+
+  expandFloatingSearchBox() {
+    if (!this.floatingSearchBox) return;
+    const size = this.settings.floatingToggleSize || 20;
+    // Dynamically determine direction based on current toggle position
+    const wrapperRect = this.floatingToggleWrapper.getBoundingClientRect();
+    const isRightSide = wrapperRect.left + wrapperRect.width / 2 > window.innerWidth / 2;
+    if (isRightSide) {
+      this.floatingSearchBox.style.left = '';
+      this.floatingSearchBox.style.right = '100%';
+      this.floatingSearchBox.style.marginLeft = '';
+      this.floatingSearchBox.style.marginRight = '4px';
+    } else {
+      this.floatingSearchBox.style.right = '';
+      this.floatingSearchBox.style.left = '100%';
+      this.floatingSearchBox.style.marginRight = '';
+      this.floatingSearchBox.style.marginLeft = '4px';
+    }
+    this.floatingSearchBox.style.width = '160px';
+    this.floatingSearchBox.style.padding = `0 ${size / 2}px`;
+    this.floatingSearchBox.style.opacity = '1';
+  }
+
+  collapseFloatingSearchBox() {
+    if (!this.floatingSearchBox) return;
+    // Don't collapse if search box is focused
+    if (document.activeElement === this.floatingSearchBox) return;
+    this.floatingSearchBox.style.width = '0';
+    this.floatingSearchBox.style.padding = '0';
+    this.floatingSearchBox.style.opacity = '0';
+  }
+
+  clampFloatingTogglePosition() {
+    if (!this.floatingToggleWrapper) return;
+    const windowW = window.innerWidth;
+    const windowH = window.innerHeight;
+    const margin = 5;
+    const rect = this.floatingToggleWrapper.getBoundingClientRect();
+    let changed = false;
+    const usesRight = this.floatingToggleWrapper.style.right && this.floatingToggleWrapper.style.right !== 'auto';
+    
+    if (usesRight) {
+      let right = parseFloat(this.floatingToggleWrapper.style.right);
+      if (!isNaN(right) && right + rect.width > windowW - margin) {
+        right = Math.max(margin, windowW - rect.width - margin);
+        this.floatingToggleWrapper.style.right = `${right}px`;
+        this.settings.floatingToggleRight = right;
+        delete this.settings.floatingToggleX;
+        changed = true;
+      }
+    } else {
+      let left = parseFloat(this.floatingToggleWrapper.style.left);
+      if (!isNaN(left) && left + rect.width > windowW - margin) {
+        left = Math.max(margin, windowW - rect.width - margin);
+        this.floatingToggleWrapper.style.left = `${left}px`;
+        this.settings.floatingToggleX = left;
+        delete this.settings.floatingToggleRight;
+        changed = true;
+      }
+    }
+    
+    let top = parseFloat(this.floatingToggleWrapper.style.top);
+    if (!isNaN(top) && top + rect.height > windowH - margin) {
+      top = Math.max(margin, windowH - rect.height - margin);
+      this.floatingToggleWrapper.style.top = `${top}px`;
+      this.settings.floatingToggleY = top;
+      changed = true;
+    }
+    
+    if (changed) this.saveSettings();
+  }
+
+  addCommands() {
+    this.addCommand({
+      id: 'toggle-minimap',
+      name: 'Toggle Minimap',
+      callback: () => {
+        if (this.minimapContainer) {
+          const isHidden = this.minimapContainer.style.display === 'none';
+          this.minimapContainer.style.display = isHidden ? 'block' : 'none';
+          if (isHidden) {
+            this.applyEditorPadding();
+          } else {
+            this.removeEditorPadding();
+          }
+        }
+      }
+    });
+  }
+
+  setupMinimap() {
+    const workspace = this.app.workspace;
+    const activeLeaf = workspace.activeLeaf;
+    if (!activeLeaf) return;
+
+    const editorEl = activeLeaf.view.containerEl;
+    if (!editorEl) return;
+
+    this.removeEditorPadding();
+
+    if (this.minimapContainer && this.minimapContainer.parentNode) {
+      this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+    }
+
+    this.minimapContainer = document.createElement('div');
+    this.minimapContainer.className = 'minimap-container';
+    editorEl.appendChild(this.minimapContainer);
+    
+    this.minimapContainer.addEventListener('contextmenu', this.boundContextMenu);
+
+    this.minimapContent = document.createElement('div');
+    this.minimapContent.className = 'minimap-content';
+    this.minimapContainer.appendChild(this.minimapContent);
+
+    this.slider = document.createElement('div');
+    this.slider.className = 'minimap-slider';
+    this.minimapContainer.appendChild(this.slider);
+
+    this.tooltip = document.createElement('div');
+    this.tooltip.className = 'minimap-tooltip';
+    this.tooltip.style.display = 'none';
+    document.body.appendChild(this.tooltip);
+
+    this.matchList = document.createElement('div');
+    this.matchList.className = 'minimap-match-list';
+    this.matchList.style.display = 'none';
+    document.body.appendChild(this.matchList);
+
+    this.previewPanel = document.createElement('div');
+    this.previewPanel.className = 'minimap-preview-panel';
+    this.previewPanel.style.display = 'none';
+    this.previewPanel.style.position = 'absolute';
+    document.body.appendChild(this.previewPanel);
+
+    this.applySettings();
+
+    this.setupListDrag();
+    this.setupListWheel();
+    this.setupSliderEvents();
+    this.updateMinimapContent();
+    this.setupScrollListener();
+    this.decorationField = null;
+
+    if (!this.isReadingMode()) {
+      this.registerEditorField();
+      this.setupPinnedMatchHover();
+    }
+
+    this.minimapContainer.addEventListener('wheel', this.boundWheel, { passive: false });
+    
+    this.applyEditorPadding();
+    
+    setTimeout(() => {
+      this.updateViewport();
+    }, 200);
+  }
+
+  setupListDrag() {
+    if (!this.matchList) return;
+    
+    // Add resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'minimap-match-list-resize-handle';
+    this.matchList.appendChild(resizeHandle);
+    
+    this.isResizingMatchList = false;
+    this.resizeStartX = 0;
+    this.resizeStartY = 0;
+    this.resizeStartWidth = 0;
+    this.resizeStartHeight = 0;
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      this.isResizingMatchList = true;
+      this.isInteractingWithList = true;
+      this.resizeStartX = e.clientX;
+      this.resizeStartY = e.clientY;
+      this.resizeStartWidth = this.matchList.offsetWidth;
+      this.resizeStartHeight = this.matchList.offsetHeight;
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!this.isResizingMatchList || !this.matchList) return;
+      
+      const dx = e.clientX - this.resizeStartX;
+      const dy = e.clientY - this.resizeStartY;
+      const newWidth = Math.max(200, Math.min(this.resizeStartWidth + dx, window.innerWidth - 20));
+      const newHeight = Math.max(150, Math.min(this.resizeStartHeight + dy, window.innerHeight - 20));
+      
+      this.matchList.style.width = `${newWidth}px`;
+      this.matchList.style.maxWidth = `${newWidth}px`;
+      this.matchList.style.height = `${newHeight}px`;
+      
+      // Update container max-height to fit within the list
+      const header = this.matchList.querySelector('.minimap-match-list-header');
+      const listContainer = this.matchList.querySelector('.minimap-match-list-container');
+      if (listContainer) {
+        const headerHeight = header ? header.offsetHeight : 36;
+        const recentSection = this.matchList.querySelector('.minimap-match-list-recent');
+        const recentHeight = recentSection ? recentSection.offsetHeight : 0;
+        const availableHeight = newHeight - headerHeight - recentHeight - 14;
+        listContainer.style.maxHeight = `${Math.max(50, availableHeight)}px`;
+      }
+      
+      this.matchListSize.width = newWidth;
+      this.matchListSize.height = newHeight;
+    });
+    
+    document.addEventListener('mouseup', (e) => {
+      if (this.isResizingMatchList) {
+        this.isResizingMatchList = false;
+        this.saveListData();
+      }
+    });
+  }
+
+  setupListWheel() {
+    if (!this.matchList) return;
+    
+    this.matchList.addEventListener('wheel', this.boundListWheel, { passive: false });
+    if (this.previewPanel) {
+      this.previewPanel.addEventListener('wheel', this.boundListWheel, { passive: false });
+    }
+  }
+
+  handleListWheel(e) {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    
+    if (this.isPreviewOpen && this.previewPanel) {
+      this.previewOpacity = Math.max(0.1, Math.min(1.0, this.previewOpacity + delta));
+      this.previewPanel.style.opacity = this.previewOpacity;
+    } else {
+      this.listOpacity = Math.max(0.1, Math.min(1.0, this.listOpacity + delta));
+      this.matchList.style.opacity = this.listOpacity;
+    }
+    
+    this.saveListData();
+  }
+
+  registerEditorField() {
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+
+    if (!this.decorationField) {
+      this.decorationField = matchHighlightField;
+      editor.cm.dispatch({
+        effects: StateEffect.appendConfig.of([this.decorationField])
+      });
+    }
+    if (!this.jumpDecoField) {
+      this.jumpDecoField = jumpHighlightField;
+      editor.cm.dispatch({
+        effects: StateEffect.appendConfig.of([this.jumpDecoField])
+      });
+    }
+
+    this.matchHighlightPlugin = MatchHighlightPlugin;
+  }
+
+  setupPinnedMatchHover() {
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+
+    const cm = editor.cm;
+    const scrollDOM = cm.scrollDOM;
+    if (!scrollDOM) return;
+
+    if (this._pinnedMatchHoverHandler) {
+      scrollDOM.removeEventListener('mouseover', this._pinnedMatchHoverHandler);
+    }
+
+    this._pinnedMatchHoverHandler = (e) => {
+      const target = e.target;
+      if (!target.classList || !target.classList.contains('minimap-editor-match')) return;
+      if (!target.classList.contains('pinned')) return;
+      if (this._isListVisible) return;
+
+      const selection = target.dataset.selection;
+      if (!selection) return;
+
+      const savedItem = this.savedMatchLists.find(item => item.selection === selection && item.pinned);
+      if (!savedItem) return;
+
+      this._searchCancelled = true;
+      this._triggeredByIndicator = true;
+      
+      const targetRect = target.getBoundingClientRect();
+      this.lastIndicatorCoords = {
+        screenX: targetRect.right + 10,
+        screenY: targetRect.top + targetRect.height / 2,
+        targetRect: targetRect
+      };
+      this._currentIndicatorSelection = selection;
+      this._currentIndicatorMatchCount = savedItem.matchCount;
+      this.showMatchList(selection, savedItem.matchCount);
+    };
+
+    scrollDOM.addEventListener('mouseover', this._pinnedMatchHoverHandler);
+  }
+
+  applyEditorPadding() {
+    const activeLeaf = this.app.workspace.activeLeaf;
+    if (!activeLeaf) return;
+    
+    const containerEl = activeLeaf.view.containerEl;
+    if (!containerEl) return;
+    
+    if (this.isReadingMode()) {
+      this.editorContentEl = containerEl.querySelector('.markdown-reading-view') ||
+                             containerEl.querySelector('.markdown-preview-view');
+    } else {
+      this.editorContentEl = containerEl.querySelector('.cm-content') || 
+                             containerEl.querySelector('.cm-editor') ||
+                             containerEl.querySelector('.markdown-source-view');
+    }
+    
+    if (this.editorContentEl) {
+      this.originalPaddingRight = this.editorContentEl.style.paddingRight || '';
+      const minimapWidth = this.minimapContainer ? this.minimapContainer.offsetWidth : 80;
+      const padding = this.settings.editorPadding || 10;
+      this.editorContentEl.style.paddingRight = `${minimapWidth + padding}px`;
+    }
+  }
+
+  removeEditorPadding() {
+    if (this.editorContentEl) {
+      this.editorContentEl.style.paddingRight = this.originalPaddingRight;
+    }
+  }
+
+  applyHideStatusBar() {
+    const statusBar = document.querySelector('.status-bar');
+    if (!statusBar) return;
+
+    if (this.settings.hideStatusBar) {
+      statusBar.classList.add('minimap-hide-statusbar');
+    } else {
+      statusBar.classList.remove('minimap-hide-statusbar');
+    }
+  }
+
+  setupScrollListener() {
+    if (this.scrollHandler) {
+      document.removeEventListener('scroll', this.scrollHandler, true);
+    }
+    
+    const activeLeaf = this.app.workspace.activeLeaf;
+    if (activeLeaf) {
+      if (this.isReadingMode()) {
+        this.editorScrollEl = this.getReadingViewScrollEl() || activeLeaf.view.containerEl;
+      } else {
+        this.editorScrollEl = activeLeaf.view.containerEl.querySelector('.cm-scroller') || 
+                             activeLeaf.view.containerEl.querySelector('.markdown-source-view') ||
+                             activeLeaf.view.containerEl;
+      }
+    }
+    
+    this.scrollHandler = (e) => {
+      if (this.isDragging) return;
+      this.updateViewport();
+      this.updatePinnedIndicatorsPosition();
+    };
+    
+    document.addEventListener('scroll', this.scrollHandler, true);
+    
+    if (this.editorScrollEl) {
+      this.editorScrollEl.addEventListener('scroll', this.scrollHandler);
+    }
+  }
+
+  // Get current visible line range using CodeMirror API
+  getVisibleLineRange() {
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return null;
+      const totalLines = this.getTotalLines();
+      const scrollTop = scrollEl.scrollTop;
+      const clientHeight = scrollEl.clientHeight;
+      const scrollHeight = scrollEl.scrollHeight;
+      const scrollRatio = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+      const viewportRatio = scrollHeight > 0 ? clientHeight / scrollHeight : 1;
+      const startLine = Math.floor(scrollRatio * totalLines);
+      const visibleLines = Math.max(1, Math.floor(viewportRatio * totalLines));
+      const endLine = Math.min(totalLines - 1, startLine + visibleLines - 1);
+      return {
+        startLine: startLine,
+        endLine: endLine,
+        visibleLines: visibleLines,
+        totalLines: totalLines,
+        scrollTop: scrollTop,
+        scrollHeight: scrollHeight,
+        clientHeight: clientHeight
+      };
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return null;
+    
+    const cm = editor.cm;
+    const scrollDOM = cm.scrollDOM;
+    if (!scrollDOM) return null;
+    
+    const scrollTop = scrollDOM.scrollTop;
+    const clientHeight = scrollDOM.clientHeight;
+    
+    // Get total line count
+    const totalLines = cm.state.doc.lines;
+    
+    // Get the line at the top of the viewport
+    const topLine = cm.lineBlockAtHeight(scrollTop);
+    const startLine = topLine ? topLine.from : 0;
+    
+    // Get the line at the bottom of the viewport
+    const bottomLine = cm.lineBlockAtHeight(scrollTop + clientHeight);
+    const endLine = bottomLine ? bottomLine.from : cm.state.doc.length;
+    
+    // Convert positions to line numbers (0-indexed)
+    const startLineNumber = cm.state.doc.lineAt(startLine).number - 1;
+    const endLineNumber = cm.state.doc.lineAt(endLine).number - 1;
+    
+    // Calculate how many lines are visible
+    const visibleLines = endLineNumber - startLineNumber + 1;
+    
+    return {
+      startLine: startLineNumber,
+      endLine: endLineNumber,
+      visibleLines: visibleLines,
+      totalLines: totalLines,
+      scrollTop: scrollTop,
+      scrollHeight: scrollDOM.scrollHeight,
+      clientHeight: clientHeight
+    };
+  }
+
+  hexToRgba(color, alpha) {
+    if (color.startsWith('rgba')) {
+      return color.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, `rgba($1, $2, $3, ${alpha})`);
+    }
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // Get total line count
+  getTotalLines() {
+    if (this.isReadingMode()) {
+      const content = this.minimapContent.textContent || '';
+      return content.split('\n').length;
+    }
+    const editor = this.getEditor();
+    if (!editor) return 0;
+    
+    const content = editor.getValue();
+    return content.split('\n').length;
+  }
+
+  // Get current scroll position as line number (0-indexed)
+  getCurrentTopLine() {
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return 0;
+      const totalLines = this.getTotalLines();
+      if (totalLines <= 0) return 0;
+      const scrollRatio = scrollEl.scrollTop / Math.max(1, scrollEl.scrollHeight - scrollEl.clientHeight);
+      return Math.floor(scrollRatio * totalLines);
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return 0;
+    
+    const cm = editor.cm;
+    const scrollDOM = cm.scrollDOM;
+    if (!scrollDOM) return 0;
+    
+    const scrollTop = scrollDOM.scrollTop;
+    const topBlock = cm.lineBlockAtHeight(scrollTop);
+    if (topBlock) {
+      return cm.state.doc.lineAt(topBlock.from).number - 1;
+    }
+    return 0;
+  }
+
+  // Get how many lines are visible in the viewport
+  getVisibleLineCount() {
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return 1;
+      const totalLines = this.getTotalLines();
+      if (totalLines <= 0) return 1;
+      const viewportRatio = scrollEl.clientHeight / Math.max(1, scrollEl.scrollHeight);
+      return Math.max(1, Math.floor(viewportRatio * totalLines));
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return 1;
+    
+    const cm = editor.cm;
+    const scrollDOM = cm.scrollDOM;
+    if (!scrollDOM) return 1;
+    
+    const scrollTop = scrollDOM.scrollTop;
+    const clientHeight = scrollDOM.clientHeight;
+    
+    const topBlock = cm.lineBlockAtHeight(scrollTop);
+    const bottomBlock = cm.lineBlockAtHeight(scrollTop + clientHeight);
+    
+    if (topBlock && bottomBlock) {
+      const startLine = cm.state.doc.lineAt(topBlock.from).number;
+      const endLine = cm.state.doc.lineAt(bottomBlock.from).number;
+      return Math.max(1, endLine - startLine + 1);
+    }
+    return 1;
+  }
+
+  setupSliderEvents() {
+    if (!this.slider || !this.minimapContainer) return;
+
+    this.slider.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.isDragging = true;
+      this.slider.classList.add('dragging');
+      this.dragStartY = e.clientY;
+      this.dragStartLine = this.getCurrentTopLine();
+    });
+
+    this.minimapContainer.addEventListener('mousedown', (e) => {
+      if (e.target === this.slider) return;
+      if (e.target.classList.contains('minimap-highlight')) return;
+      if (e.button !== 0) return;
+      this.jumpToPosition(e);
+    });
+  }
+
+  handleMouseMove(e) {
+    if (!this.isDragging) return;
+    e.preventDefault();
+
+    if (!this.minimapContainer) return;
+    const containerHeight = this.minimapContainer.clientHeight;
+    const deltaY = e.clientY - this.dragStartY;
+
+    const totalLines = this.getTotalLines();
+    if (totalLines <= 0) return;
+
+    const lineHeightInMinimap = 2;
+    const naturalContentHeight = totalLines * lineHeightInMinimap;
+    const contentHeight = Math.min(containerHeight, naturalContentHeight);
+
+    const lineDelta = (deltaY / contentHeight) * totalLines;
+    const newLine = this.dragStartLine + lineDelta;
+    const clampedLine = Math.max(0, Math.min(newLine, totalLines - 1));
+
+    this.scrollToLine(clampedLine);
+  }
+
+  scrollToLine(lineNumber) {
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return;
+      const file = this.app.workspace.activeLeaf?.view?.file;
+      if (!file) return;
+      this.app.vault.read(file).then(content => {
+        const lines = content.split('\n');
+        if (lineNumber < 0 || lineNumber >= lines.length) return;
+        // Calculate approximate scroll position based on line ratio
+        const ratio = lineNumber / Math.max(1, lines.length - 1);
+        const scrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight;
+        scrollEl.scrollTop = ratio * scrollHeight;
+      }).catch(() => {});
+      if (this.currentSelection) {
+        setTimeout(() => this.highlightMatches(), 10);
+      }
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+    
+    const cm = editor.cm;
+    const doc = cm.state.doc;
+    
+    if (lineNumber < 0 || lineNumber >= doc.lines) return;
+    
+    const line = doc.line(lineNumber + 1);
+    
+    // Scroll the DOM directly without changing cursor
+    if (cm.scrollDOM) {
+      const lineBlock = cm.lineBlockAt(line.from);
+      if (lineBlock) {
+        cm.scrollDOM.scrollTop = lineBlock.top;
+      }
+    }
+    
+    // Re-apply highlights after scroll
+    if (this.currentSelection) {
+      setTimeout(() => this.highlightMatches(), 10);
+    }
+  }
+
+  handleMouseUp(e) {
+    if (this.isDragging) {
+      this.isDragging = false;
+      if (this.slider) {
+        this.slider.classList.remove('dragging');
+      }
+      if (this.currentSelection) {
+        setTimeout(() => this.highlightMatches(), 10);
+      }
+    } else if (!this.isJumping && !this.isInteractingWithList) {
+      // Don't trigger handleSelection if mouseup is inside the match list (text selection)
+      const isInsideMatchList = this.matchList && this.matchList.contains(e.target);
+      const isInsideKeywordBtn = e.target.closest('.swift-match-keyword-btn-wrapper');
+      if (!isInsideMatchList && !isInsideKeywordBtn) {
+        this.handleSelection();
+      }
+      this.isJumping = false;
+    }
+    this.isInteractingWithList = false;
+  }
+
+  handleWheel(e) {
+    e.preventDefault();
+    
+    // Alt + wheel: adjust opacity
+    if (e.altKey) {
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      this.opacity = Math.max(0.1, Math.min(1, this.opacity + delta));
+      if (this.minimapContainer) {
+        this.minimapContainer.style.opacity = this.opacity;
+      }
+    } else {
+      // Normal wheel: scroll document page by page
+      if (this.isReadingMode()) {
+        const scrollEl = this.getReadingViewScrollEl();
+        if (!scrollEl) return;
+        const clientHeight = scrollEl.clientHeight;
+        const scrollAmount = clientHeight * 0.9;
+        const direction = e.deltaY > 0 ? 1 : -1;
+        scrollEl.scrollTop += direction * scrollAmount;
+      } else {
+        const editor = this.getEditor();
+        if (!editor || !editor.cm) return;
+        
+        const cm = editor.cm;
+        if (!cm.scrollDOM) return;
+        
+        const clientHeight = cm.scrollDOM.clientHeight;
+        const scrollAmount = clientHeight * 0.9; // Scroll 90% of page height
+        
+        const direction = e.deltaY > 0 ? 1 : -1;
+        cm.scrollDOM.scrollTop += direction * scrollAmount;
+      }
+    }
+  }
+
+  jumpToPosition(e) {
+    const totalLines = this.getTotalLines();
+    if (totalLines <= 0) return;
+
+    const containerHeight = this.minimapContainer.clientHeight;
+    const containerRect = this.minimapContainer.getBoundingClientRect();
+    const clickY = e.clientY - containerRect.top;
+
+    const lineHeightInMinimap = 2;
+    const naturalContentHeight = totalLines * lineHeightInMinimap;
+    const contentHeight = Math.min(containerHeight, naturalContentHeight);
+
+    const ratio = clickY / contentHeight;
+    const targetLine = Math.floor(ratio * totalLines);
+    const clampedLine = Math.max(0, Math.min(targetLine, totalLines - 1));
+
+    this.isJumping = true;
+    
+    if (this.isReadingMode()) {
+      this.scrollToLine(clampedLine);
+    } else {
+      const editor = this.getEditor();
+      if (editor && editor.cm) {
+        try {
+          this.jumpToMatch({ line: clampedLine, pos: 0 });
+        } catch (err) {
+          this.scrollToLine(clampedLine);
+        }
+      } else {
+        this.scrollToLine(clampedLine);
+      }
+    }
+  }
+
+  jumpToMatch(targetMatch) {
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return;
+      const file = this.app.workspace.activeLeaf?.view?.file;
+      if (!file) return;
+      this.app.vault.read(file).then(content => {
+        const lines = content.split('\n');
+        const lineNumber = targetMatch.line;
+        if (lineNumber < 0 || lineNumber >= lines.length) return;
+        const ratio = lineNumber / Math.max(1, lines.length - 1);
+        const scrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight;
+        scrollEl.scrollTop = ratio * scrollHeight;
+      }).catch(() => {});
+      this.isJumping = true;
+      setTimeout(() => {
+        this.isJumping = false;
+      }, 150);
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor) return;
+
+    const cm = editor.cm;
+    if (!cm) return;
+
+    this.isJumping = true;
+
+    const line = cm.state.doc.line(targetMatch.line + 1);
+    const foundPos = line.from + targetMatch.pos;
+
+    const originalSelection = this.currentSelection;
+    const originalCursor = this.currentCursor;
+
+    cm.dispatch({
+      selection: { anchor: foundPos },
+      scrollIntoView: { range: { from: foundPos, to: foundPos } }
+    });
+
+    setTimeout(() => {
+      if (!this.isJumping) return;
+      this.currentSelection = originalSelection;
+      this.currentCursor = originalCursor;
+      if (this.currentSelection) {
+        this.highlightMatches();
+      }
+      this.isJumping = false;
+    }, 150);
+  }
+
+  getEditor() {
+    return this.app.workspace.activeLeaf?.view?.editor || null;
+  }
+
+  showPinIcon() {
+    if (!this.settings.pinIconEnabled) return;
+    if (!this.currentSelection) return;
+
+    // Check if current selection is already pinned
+    const exactPinned = this.savedMatchLists.find(m => m.selection === this.currentSelection && m.pinned);
+    // Check if current selection contains any pinned texts
+    const containedPinned = this.savedMatchLists.filter(m => m.pinned && this.currentSelection.includes(m.selection));
+
+    // Save current pin icon position before hiding (in case it was dragged)
+    if (this._pinIcon && this.settings.pinIconMode === 'fixed') {
+      this.settings.pinIconFixedLeft = parseFloat(this._pinIcon.style.left);
+      this.settings.pinIconFixedTop = parseFloat(this._pinIcon.style.top);
+    }
+
+    this.hidePinIcon();
+
+    const icon = document.createElement('div');
+    icon.className = 'minimap-pin-icon';
+    icon.style.position = 'fixed';
+    icon.style.zIndex = '9999';
+    icon.style.cursor = 'pointer';
+    icon.style.width = `${this.settings.pinIconSize}px`;
+    icon.style.height = `${this.settings.pinIconSize}px`;
+    icon.style.borderRadius = '50%';
+    icon.style.fontSize = `${Math.round(this.settings.pinIconSize * 0.55)}px`;
+    icon.style.fontWeight = '700';
+    icon.style.display = 'flex';
+    icon.style.alignItems = 'center';
+    icon.style.justifyContent = 'center';
+    icon.style.opacity = this.settings.pinIconOpacity;
+    icon.style.transition = 'opacity 0.15s, transform 0.15s';
+    icon.style.userSelect = 'none';
+    icon.style.lineHeight = '1';
+    icon.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
+
+    if (exactPinned) {
+      // Current selection is pinned - show unpin button
+      icon.textContent = '✕';
+      icon.title = t('unpin');
+      const scheme = this.getPinnedColorScheme(exactPinned);
+      icon.style.backgroundColor = scheme.counterBgColor;
+      icon.style.color = scheme.counterColor;
+    } else if (containedPinned.length > 0) {
+      // Current selection contains pinned texts - show clear button
+      icon.textContent = '✕';
+      icon.title = t('clearPinned', containedPinned.length);
+      const scheme = containedPinned[0];
+      icon.style.backgroundColor = scheme.counterBgColor || '#cc0000';
+      icon.style.color = scheme.counterColor || '#ffffff';
+    } else {
+      // Not pinned - show pin button
+      icon.textContent = this.settings.pinIconText || 'm';
+      icon.title = t('pinMatch');
+      const scheme = this.getCurrentSelectionColorScheme();
+      icon.style.backgroundColor = scheme.counterBgColor;
+      icon.style.color = scheme.counterColor;
+    }
+
+    if (this.settings.pinIconMode === 'follow') {
+      icon.style.left = `${this._lastMouseX + 15}px`;
+      icon.style.top = `${this._lastMouseY - 10}px`;
+    } else {
+      // Fixed position: use saved position or default to right side of editor
+      if (this.settings.pinIconFixedLeft != null && this.settings.pinIconFixedTop != null) {
+        icon.style.left = `${this.settings.pinIconFixedLeft}px`;
+        icon.style.top = `${this.settings.pinIconFixedTop}px`;
+      } else {
+        const leaf = this.app.workspace.activeLeaf;
+        if (leaf) {
+          const rect = leaf.view.containerEl.getBoundingClientRect();
+          icon.style.left = `${rect.right - 40}px`;
+          icon.style.top = `${rect.top + 10}px`;
+        } else {
+          icon.style.left = `${window.innerWidth - 50}px`;
+          icon.style.top = '100px';
+        }
+      }
+    }
+
+    icon.addEventListener('mouseenter', () => {
+      icon.style.transform = 'scale(1.2)';
+      icon.style.opacity = '1';
+    });
+    icon.addEventListener('mouseleave', () => {
+      icon.style.transform = 'scale(1)';
+      icon.style.opacity = this.settings.pinIconOpacity;
+    });
+
+    // Click to pin
+    let clickDisabled = false;
+
+    icon.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      this.isInteractingWithList = true;
+    });
+
+    icon.addEventListener('click', (e) => {
+      if (clickDisabled) {
+        clickDisabled = false;
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (exactPinned) {
+        // Unpin the exact match
+        this.removePinnedSelection(this.currentSelection);
+      } else if (containedPinned.length > 0) {
+        // Remove all contained pinned items
+        for (const item of containedPinned) {
+          const idx = this.savedMatchLists.findIndex(m => m.selection === item.selection && m.pinned);
+          if (idx >= 0) {
+            this.savedMatchLists.splice(idx, 1);
+          }
+        }
+        this.saveListData();
+        this.clearHighlights();
+        this.showPinnedDecorations();
+        if (this.currentSelection) {
+          this.highlightMatches();
+        }
+      } else {
+        // Pin current selection
+        this.pinCurrentSelection();
+      }
+      this.hidePinIcon();
+    });
+
+    // Drag support for fixed mode
+    if (this.settings.pinIconMode === 'fixed') {
+      let isDraggingIcon = false;
+      let hasDragged = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let dragOffsetX = 0;
+      let dragOffsetY = 0;
+
+      icon.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isDraggingIcon = true;
+        hasDragged = false;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragOffsetX = e.clientX - icon.getBoundingClientRect().left;
+        dragOffsetY = e.clientY - icon.getBoundingClientRect().top;
+        icon.style.transition = 'none';
+
+        const onDragMove = (e) => {
+          if (!isDraggingIcon) return;
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            if (!hasDragged) {
+              hasDragged = true;
+              icon.style.cursor = 'grabbing';
+            }
+            const newLeft = e.clientX - dragOffsetX;
+            const newTop = e.clientY - dragOffsetY;
+            icon.style.left = `${newLeft}px`;
+            icon.style.top = `${newTop}px`;
+          }
+        };
+
+        const onDragEnd = (e) => {
+          if (!isDraggingIcon) return;
+          isDraggingIcon = false;
+          icon.style.cursor = 'pointer';
+          icon.style.transition = 'opacity 0.15s, transform 0.15s';
+          if (hasDragged) {
+            // Was a drag - save position and prevent click
+            clickDisabled = true;
+            this.settings.pinIconFixedLeft = parseFloat(icon.style.left);
+            this.settings.pinIconFixedTop = parseFloat(icon.style.top);
+            this.saveSettings();
+          }
+          document.removeEventListener('mousemove', onDragMove);
+          document.removeEventListener('mouseup', onDragEnd);
+        };
+
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+      });
+    }
+
+    document.body.appendChild(icon);
+    this._pinIcon = icon;
+
+    // Follow mouse mode
+    if (this.settings.pinIconMode === 'follow') {
+      let followTimer = null;
+      let isFollowing = true;
+      this._pinIconFollowHandler = (e) => {
+        if (!this._pinIcon) return;
+        // Reset timer on each mouse move
+        if (followTimer) clearTimeout(followTimer);
+        // Resume following and update position
+        isFollowing = true;
+        this._pinIcon.style.left = `${e.clientX + 15}px`;
+        this._pinIcon.style.top = `${e.clientY - 10}px`;
+        // Stop following after mouse is stationary for 400ms
+        followTimer = setTimeout(() => {
+          isFollowing = false;
+        }, 400);
+      };
+      this._pinIconFollowStopCheck = () => isFollowing;
+      document.addEventListener('mousemove', this._pinIconFollowHandler);
+    }
+  }
+
+  hidePinIcon() {
+    if (this._pinIconFollowHandler) {
+      document.removeEventListener('mousemove', this._pinIconFollowHandler);
+      this._pinIconFollowHandler = null;
+    }
+    if (this._pinIcon) {
+      this._pinIcon.remove();
+      this._pinIcon = null;
+    }
+  }
+
+  pinCurrentSelection() {
+    if (!this.currentSelection) return;
+
+    // Calculate next color index
+    const pinnedItems = this.savedMatchLists.filter(m => m.pinned);
+    const nextColorIndex = pinnedItems.length % this.settings.pinColorSchemes.length;
+    const colorScheme = this.settings.pinColorSchemes[nextColorIndex];
+
+    const existingIndex = this.savedMatchLists.findIndex(m => m.selection === this.currentSelection);
+    if (existingIndex >= 0) {
+      this.savedMatchLists[existingIndex].pinned = true;
+      this.savedMatchLists[existingIndex].colorIndex = nextColorIndex;
+      this.savedMatchLists[existingIndex].borderColor = colorScheme.borderColor;
+      this.savedMatchLists[existingIndex].counterBgColor = colorScheme.counterBgColor;
+      this.savedMatchLists[existingIndex].counterColor = colorScheme.counterColor;
+    } else {
+      this.savedMatchLists.unshift({
+        selection: this.currentSelection,
+        pinned: true,
+        colorIndex: nextColorIndex,
+        borderColor: colorScheme.borderColor,
+        counterBgColor: colorScheme.counterBgColor,
+        counterColor: colorScheme.counterColor,
+        matchCount: 0,
+        filePath: '',
+        fileName: ''
+      });
+    }
+
+    this.saveListData();
+    // Re-apply highlights with pinned colors
+    this.clearHighlights();
+    this.showPinnedDecorations();
+    // Also re-highlight current selection on top
+    if (this.currentSelection) {
+      this.highlightMatches();
+    }
+  }
+
+  unpinSelection(selection) {
+    const index = this.savedMatchLists.findIndex(m => m.selection === selection && m.pinned);
+    if (index >= 0) {
+      this.savedMatchLists[index].pinned = false;
+      delete this.savedMatchLists[index].colorIndex;
+      delete this.savedMatchLists[index].borderColor;
+      delete this.savedMatchLists[index].counterBgColor;
+      delete this.savedMatchLists[index].counterColor;
+      this.saveListData();
+    }
+    this.clearHighlights();
+    this.showPinnedDecorations();
+    if (this.currentSelection) {
+      this.highlightMatches();
+    }
+  }
+
+  removePinnedSelection(selection) {
+    const index = this.savedMatchLists.findIndex(m => m.selection === selection);
+    if (index >= 0) {
+      this.savedMatchLists.splice(index, 1);
+      this.saveListData();
+    }
+    this.clearHighlights();
+    this.showPinnedDecorations();
+    if (this.currentSelection) {
+      this.highlightMatches();
+    }
+  }
+
+  isReadingMode() {
+    const leaf = this.app.workspace.activeLeaf;
+    if (!leaf) return false;
+    const viewState = leaf.getViewState();
+    return viewState && viewState.state && viewState.state.mode === 'preview';
+  }
+
+  getReadingViewScrollEl() {
+    const leaf = this.app.workspace.activeLeaf;
+    if (!leaf) return null;
+    const containerEl = leaf.view.containerEl;
+    if (!containerEl) return null;
+
+    // Try to find the actual scrolling container by checking which element has scrollable content
+    const candidates = [
+      containerEl.querySelector('.markdown-reading-view'),
+      containerEl.querySelector('.markdown-preview-view'),
+      containerEl.querySelector('.workspace-leaf-content'),
+      containerEl.querySelector('.view-content'),
+    ];
+
+    for (const el of candidates) {
+      if (el && el.scrollHeight > el.clientHeight + 1) {
+        return el;
+      }
+    }
+
+    // Fallback: find any scrollable ancestor of the reading view
+    const readingView = containerEl.querySelector('.markdown-reading-view') ||
+                        containerEl.querySelector('.markdown-preview-view');
+    if (readingView) {
+      let parent = readingView.parentElement;
+      while (parent && parent !== containerEl) {
+        if (parent.scrollHeight > parent.clientHeight + 1) {
+          return parent;
+        }
+        parent = parent.parentElement;
+      }
+    }
+
+    return readingView || containerEl;
+  }
+
+  getReadingViewContentEl() {
+    const leaf = this.app.workspace.activeLeaf;
+    if (!leaf) return null;
+    const containerEl = leaf.view.containerEl;
+    if (!containerEl) return null;
+    return containerEl.querySelector('.markdown-reading-view') ||
+           containerEl.querySelector('.markdown-preview-view');
+  }
+
+  async getFileContent() {
+    const file = this.app.workspace.activeLeaf?.view?.file;
+    if (!file) return '';
+    try {
+      return await this.app.vault.read(file);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  registerEvents() {
+    // Track mouse position for pin icon follow mode
+    document.addEventListener('mousemove', (e) => {
+      this._lastMouseX = e.clientX;
+      this._lastMouseY = e.clientY;
+    });
+
+    this.registerEvent(
+      this.app.workspace.on('editor-change', () => {
+        this.scheduleUpdate();
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', (leaf) => {
+        if (this.isPreviewOpen && this.previewSourceLeaf && leaf !== this.previewSourceLeaf) {
+          this.closePreview();
+          return;
+        }
+        // Clear count when document changes if clearCountOnClose is enabled
+        if (this.settings.clearCountOnClose) {
+          this.savedMatchLists = [];
+          this.saveListData();
+        }
+        this.hidePinIcon();
+        this.clearHighlights();
+        this.hideAllMatchListIndicators();
+        this.setupMinimap();
+        this.updateMinimapContent();
+        this.handleSelection();
+        // Setup SwiftMatch export navigation
+        this._setupSwiftMatchExportNav();
+      })
+    );
+
+    // Listen for mode changes (source <-> reading)
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => {
+        if (this._isApplyingReadingHighlights) return;
+        this.clearHighlights();
+        this.hideAllMatchListIndicators();
+        this.setupMinimap();
+        this.updateMinimapContent();
+        // Re-apply highlights after layout change if there's a current selection
+        if (this.currentSelection) {
+          setTimeout(() => this.handleSelection(), 150);
+        }
+      })
+    );
+
+    // Handle text selection in reading mode via mouseup
+    this._readingModeMouseUpHandler = (e) => {
+      if (this.isReadingMode()) {
+        // Don't trigger if mouseup is inside the match list (text selection)
+        const isInsideMatchList = this.matchList && this.matchList.contains(e.target);
+        const isInsideKeywordBtn = e.target.closest('.swift-match-keyword-btn-wrapper');
+        if (!isInsideMatchList && !isInsideKeywordBtn) {
+          setTimeout(() => this.handleSelection(), 100);
+        }
+      }
+    };
+    document.addEventListener('mouseup', this._readingModeMouseUpHandler);
+
+    // Handle keyup for keyboard-based selection in reading mode
+    this._readingModeKeyUpHandler = (e) => {
+      if (this.isReadingMode() && e.shiftKey) {
+        setTimeout(() => this.handleSelection(), 100);
+      }
+    };
+    document.addEventListener('keyup', this._readingModeKeyUpHandler);
+
+    this.registerEvent(
+      this.app.vault.on('modify', (file) => {
+        if (file && file.extension === 'md') {
+          this.updateHeadingCacheForFile(file);
+        }
+      })
+    );
+
+    this.registerEvent(
+      this.app.vault.on('delete', (file) => {
+        if (file && file.path) {
+          this.headingCache.delete(file.path);
+          this.saveListData();
+        }
+      })
+    );
+
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => {
+        if (file && file.extension === 'md') {
+          this.headingCache.delete(oldPath);
+          this.updateHeadingCacheForFile(file);
+        }
+      })
+    );
+
+    window.addEventListener('resize', () => {
+      this.updateMinimapContent();
+      this.clampFloatingTogglePosition();
+    });
+
+    this.registerInterval(
+      window.setInterval(() => {
+        this.updateViewport();
+      }, 50)
+    );
+  }
+
+  scheduleUpdate() {
+    if (this.updateTimer) clearTimeout(this.updateTimer);
+    this.updateTimer = setTimeout(() => {
+      this.updateMinimapContent();
+      this.handleSelection();
+    }, 150);
+  }
+
+  handleSelection() {
+    if (this.isJumping) return;
+    if (this.isPreviewOpen) return;
+
+    if (this.isReadingMode()) {
+      const sel = window.getSelection();
+      const selectionText = sel ? sel.toString().trim() : '';
+      if (selectionText.length > 0) {
+        if (this.currentSelection !== selectionText) this._listUserDismissed = false;
+        this.currentSelection = selectionText;
+        this.currentCursor = null;
+        this.highlightMatches();
+        this.showPinIcon();
+      } else if (this._isApplyingReadingHighlights) {
+        return;
+      } else {
+        this.currentSelection = '';
+        this.hidePinIcon();
+        this.clearHighlights();
+        this.hideNonPinnedIndicators();
+        this.showPinnedDecorations();
+      }
+    } else {
+      const editor = this.getEditor();
+      if (!editor) return;
+
+      const selection = editor.getSelection();
+      if (selection && selection.trim().length > 0) {
+        if (this.currentSelection !== selection.trim()) this._listUserDismissed = false;
+        this.currentSelection = selection.trim();
+        this.currentCursor = editor.getCursor();
+        this.highlightMatches();
+        this.showPinIcon();
+      } else {
+        this.currentSelection = '';
+        this.hidePinIcon();
+        this.clearHighlights();
+        this.hideNonPinnedIndicators();
+        this.showPinnedDecorations();
+      }
+    }
+  }
+
+  highlightMatches() {
+    if (!this.minimapContainer || !this.currentSelection || this.isDragging) return;
+
+    this.clearHighlights();
+    this.hideAllMatchListIndicators();
+
+    const selection = this.currentSelection;
+
+    if (selection.length < 1) return;
+
+    if (selection.length === 1 && !/[a-zA-Z0-9\u4e00-\u9fa5]/.test(selection)) return;
+
+    this.showAllPinnedIndicators();
+
+    const isReading = this.isReadingMode();
+
+    let content;
+    if (isReading) {
+      content = this.minimapContent.textContent || '';
+    } else {
+      const editor = this.getEditor();
+      if (!editor || !editor.cm) return;
+      content = editor.getValue();
+    }
+
+    const containerHeight = this.minimapContainer.clientHeight;
+    const lineCount = content.split('\n').length;
+    const currentLine = (!isReading && this.currentCursor) ? this.currentCursor.line : -1;
+
+    const lineHeightInMinimap = 2;
+    const naturalContentHeight = lineCount * lineHeightInMinimap;
+    const contentHeight = Math.min(containerHeight, naturalContentHeight);
+
+    const lines = content.split('\n');
+    const matchLines = [];
+
+    const searchLower = selection.toLowerCase();
+    for (let i = 0; i < lines.length; i++) {
+      const lineLower = lines[i].toLowerCase();
+      let pos = 0;
+      while ((pos = lineLower.indexOf(searchLower, pos)) !== -1) {
+        if (!matchLines.some(m => m.line === i && m.pos === pos)) {
+          matchLines.push({ line: i, pos: pos, index: matchLines.length + 1 });
+        }
+        pos += 1;
+      }
+    }
+    const totalMatches = matchLines.length;
+
+    const fragment = document.createDocumentFragment();
+
+    const currentCursor = (!isReading && this.currentCursor) ? this.currentCursor.ch : 0;
+
+    const currentColorScheme = this.getCurrentSelectionColorScheme();
+
+    for (let idx = 0; idx < matchLines.length; idx++) {
+      const match = matchLines[idx];
+      const i = match.line;
+
+      const highlight = document.createElement('div');
+      highlight.dataset.matchIndex = match.index;
+
+      const highlightHeight = Math.max(4, contentHeight / Math.max(1, lineCount));
+      const topPercentage = i / Math.max(1, lineCount - 1);
+      const top = topPercentage * contentHeight;
+
+      if (i === currentLine) {
+        highlight.className = 'minimap-highlight minimap-highlight-current';
+        highlight.style.backgroundColor = currentColorScheme.borderColor;
+      } else {
+        highlight.className = 'minimap-highlight';
+        highlight.style.backgroundColor = currentColorScheme.borderColor;
+      }
+
+      highlight.style.left = '0';
+      highlight.style.top = `${top}px`;
+      highlight.style.width = '100%';
+      highlight.style.height = `${highlightHeight}px`;
+      highlight.dataset.matchTotal = totalMatches;
+      highlight.dataset.line = i;
+      highlight.dataset.pos = match.pos;
+
+      const targetMatch = match;
+      const tooltip = this.tooltip;
+
+      highlight.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.jumpToMatch(targetMatch);
+      });
+
+      highlight.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      });
+
+      highlight.addEventListener('mouseenter', (e) => {
+        if (!tooltip) return;
+        tooltip.textContent = `${highlight.dataset.matchIndex}/${highlight.dataset.matchTotal}`;
+        tooltip.style.display = 'block';
+      });
+
+      highlight.addEventListener('mousemove', (e) => {
+        if (!tooltip) return;
+        let left = e.clientX + 15;
+        let top = e.clientY - 30;
+        if (left + 80 > window.innerWidth) left = window.innerWidth - 90;
+        if (top < 10) top = 10;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      });
+
+      highlight.addEventListener('mouseleave', () => {
+        if (!tooltip) return;
+        tooltip.style.display = 'none';
+      });
+
+      fragment.appendChild(highlight);
+      this.highlights.push(highlight);
+    }
+
+    this.minimapContainer.appendChild(fragment);
+
+    if (isReading) {
+      // Add pinned highlights first, then current selection on top
+      this.showPinnedDecorations();
+      this.addReadingViewHighlights(selection, totalMatches, this.getCurrentSelectionColorScheme());
+    } else {
+      const editor = this.getEditor();
+      if (editor && editor.cm) {
+        this.addEditorDecorationsWithPinned(editor.cm, matchLines, totalMatches);
+      }
+    }
+
+    if (totalMatches > 0) {
+      this.saveCurrentMatchList(selection, totalMatches);
+    } else {
+      this.hideAllMatchListIndicators();
+    }
+
+    this.showMatchList(selection, matchLines.length);
+  }
+
+  addReadingViewHighlights(searchText, totalMatches, colorScheme = null) {
+    const readingEl = this.getReadingViewContentEl();
+    if (!readingEl) return;
+
+    const savedItem = this.savedMatchLists.find(m => m.selection === searchText);
+    const hideCounter = savedItem && savedItem.countHidden;
+
+    this._isApplyingReadingHighlights = true;
+
+    // Disconnect previous observer
+    if (this._readingViewObserver) {
+      this._readingViewObserver.disconnect();
+      this._readingViewObserver = null;
+    }
+    if (this._readingHighlightRetryTimer) {
+      clearTimeout(this._readingHighlightRetryTimer);
+      this._readingHighlightRetryTimer = null;
+    }
+
+    const borderColor = colorScheme ? colorScheme.borderColor : this.getCurrentSelectionColorScheme().borderColor;
+    const borderWidth = this.settings.matchBorderWidth;
+    const counterOpacity = this.settings.counterOpacity;
+    const counterBgOpacity = this.settings.counterBgOpacity;
+    const counterColor = colorScheme ? colorScheme.counterColor : this.getCurrentSelectionColorScheme().counterColor;
+    const counterBgColor = colorScheme ? colorScheme.counterBgColor : this.getCurrentSelectionColorScheme().counterBgColor;
+    const counterSize = this.settings.counterSize;
+    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterTopOffset = `${this.settings.counterTopOffset}px`;
+
+    readingEl.style.setProperty('--minimap-match-color', borderColor);
+    readingEl.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+    readingEl.style.setProperty('--minimap-counter-opacity', counterOpacity);
+    readingEl.style.setProperty('--minimap-counter-color', counterColor);
+    readingEl.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    readingEl.style.setProperty('--minimap-counter-size', `${counterSize}px`);
+    readingEl.style.setProperty('--minimap-counter-padding', counterPadding);
+    readingEl.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
+
+    this._readingViewHighlightNodes = [];
+
+    const walker = document.createTreeWalker(readingEl, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    const searchLower = searchText.toLowerCase();
+    let matchIndex = 0;
+
+    for (const textNode of textNodes) {
+      const text = textNode.textContent;
+      const textLower = text.toLowerCase();
+      let pos = 0;
+      let matchPos;
+
+      const fragments = [];
+      let lastEnd = 0;
+
+      while ((matchPos = textLower.indexOf(searchLower, pos)) !== -1) {
+        if (matchPos > lastEnd) {
+          fragments.push(document.createTextNode(text.substring(lastEnd, matchPos)));
+        }
+
+        const mark = document.createElement('mark');
+        mark.className = `minimap-reading-match${hideCounter ? ' minimap-hide-counter' : ''}`;
+        mark.textContent = text.substring(matchPos, matchPos + searchText.length);
+        mark.style.background = 'transparent';
+        mark.dataset.matchIndex = ++matchIndex;
+        mark.dataset.matchTotal = totalMatches;
+        mark.dataset.match = `${matchIndex}/${totalMatches}`;
+        fragments.push(mark);
+        this._readingViewHighlightNodes.push(mark);
+
+        lastEnd = matchPos + searchText.length;
+        pos = lastEnd;
+      }
+
+      if (fragments.length > 0) {
+        if (lastEnd < text.length) {
+          fragments.push(document.createTextNode(text.substring(lastEnd)));
+        }
+        const parent = textNode.parentNode;
+        if (parent) {
+          const span = document.createElement('span');
+          for (const f of fragments) {
+            span.appendChild(f);
+          }
+          parent.replaceChild(span, textNode);
+        }
+      }
+    }
+
+    // Set up MutationObserver to re-apply highlights when DOM is re-rendered
+    const self = this;
+    this._readingViewObserver = new MutationObserver((mutations) => {
+      // Check if our highlights were removed
+      if (!self.currentSelection || self._isApplyingReadingHighlights) return;
+
+      const existingMarks = readingEl.querySelectorAll('mark.minimap-reading-match');
+      if (existingMarks.length === 0) {
+        // Our highlights were removed, re-apply them
+        self._isApplyingReadingHighlights = true;
+        if (self._readingHighlightRetryTimer) clearTimeout(self._readingHighlightRetryTimer);
+        self._readingHighlightRetryTimer = setTimeout(() => {
+          if (self.currentSelection && self.isReadingMode()) {
+            self.addReadingViewHighlights(self.currentSelection, self._lastTotalMatches || 0);
+          }
+        }, 100);
+      }
+    });
+
+    this._readingViewObserver.observe(readingEl, {
+      childList: true,
+      subtree: true
+    });
+
+    this._lastTotalMatches = totalMatches;
+
+    // Clear the flag after a short delay to allow DOM changes to settle
+    setTimeout(() => {
+      this._isApplyingReadingHighlights = false;
+    }, 300);
+  }
+
+  clearReadingViewHighlights() {
+    // Disconnect observer before clearing
+    if (this._readingViewObserver) {
+      this._readingViewObserver.disconnect();
+      this._readingViewObserver = null;
+    }
+    if (this._readingHighlightRetryTimer) {
+      clearTimeout(this._readingHighlightRetryTimer);
+      this._readingHighlightRetryTimer = null;
+    }
+
+    const readingEl = this.getReadingViewContentEl();
+    if (!readingEl) return;
+
+    const marks = readingEl.querySelectorAll('mark.minimap-reading-match');
+    for (const mark of marks) {
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent), mark);
+        parent.normalize();
+      }
+    }
+
+    // Clean up wrapper spans that we may have created
+    const wrapperSpans = readingEl.querySelectorAll('span');
+    for (const span of wrapperSpans) {
+      if (span.className === '' && span.parentNode && !span.dataset.matchIndex) {
+        const parent = span.parentNode;
+        while (span.firstChild) {
+          parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
+        parent.normalize();
+      }
+    }
+
+    this._readingViewHighlightNodes = [];
+  }
+
+  hideAllMatchListIndicators() {
+    for (const indicator of this.matchListIndicators) {
+      if (indicator && indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator);
+      }
+    }
+    this.matchListIndicators = [];
+  }
+
+  hideNonPinnedIndicators() {
+    const toRemove = [];
+    for (const indicator of this.matchListIndicators) {
+      if (!indicator.classList.contains('pinned')) {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator);
+        }
+        toRemove.push(indicator);
+      } else {
+        indicator.classList.remove('current');
+      }
+    }
+    this.matchListIndicators = this.matchListIndicators.filter(ind => !toRemove.includes(ind));
+  }
+
+  showPinnedIndicators(selection) {
+  }
+
+  hidePinnedIndicators(selection) {
+  }
+
+  updatePinnedIndicatorsPosition() {
+  }
+
+  createMissingPinnedIndicators() {
+  }
+
+  async showAllPinnedIndicators() {
+    this.createMissingPinnedIndicators();
+  }
+
+  async saveCurrentMatchList(selection, matchCount) {
+    const file = this.app.workspace.activeLeaf?.view?.file;
+    if (!file) return;
+
+    const existingIndex = this.savedMatchLists.findIndex(m => m.selection === selection);
+    
+    if (existingIndex >= 0) {
+      this.savedMatchLists[existingIndex].filePath = file.path;
+      this.savedMatchLists[existingIndex].fileName = file.basename;
+      this.savedMatchLists[existingIndex].matchCount = matchCount;
+
+      if (!this.isReadingMode()) {
+        const editor = this.getEditor();
+        if (editor) {
+          const cursor = editor.getCursor('from');
+          if (cursor) {
+            this.savedMatchLists[existingIndex].line = cursor.line;
+            this.savedMatchLists[existingIndex].ch = cursor.ch;
+          }
+        }
+      }
+
+      this.saveListData();
+    }
+  }
+
+  updateFloatingToggleBadge(docCount, matchCount) {
+    if (!this.floatingToggle) return;
+    const textEl = this.floatingToggleText;
+    if (!textEl) return;
+    const toggleText = this.settings.floatingToggleText || 'Swift';
+    if (!this.currentSelection) {
+      textEl.textContent = toggleText;
+    } else if (docCount > 0) {
+      const docStr = docCount > 99 ? '99+' : docCount;
+      const matchStr = matchCount > 0 ? (matchCount > 999 ? '999+' : matchCount) : '';
+      textEl.textContent = matchStr ? `${docStr}|${matchStr}` : `${docStr}`;
+    } else {
+      textEl.textContent = toggleText;
+    }
+    // Re-apply strikethrough if disabled
+    if (!this.settings.enableSelectionMatch) {
+      textEl.style.textDecoration = 'line-through';
+      textEl.style.textDecorationColor = 'rgba(240, 100, 120, 0.7)';
+    }
+  }
+
+  async _performMatchListSearch(searchText, matchCount, cacheOnly = false) {
+    const cacheKey = searchText;
+    
+    const savedData = this.savedMatchLists.find(m => m.selection === searchText);
+    if (savedData && savedData.pinned && savedData.fileMapData) {
+      const fileMap = await this.deserializeFileMap(savedData.fileMapData);
+      if (fileMap && fileMap.size > 0) {
+        this._cachedMatchList = fileMap;
+        this._cachedMatchListKey = cacheKey;
+        return;
+      }
+    }
+
+    if (this._cachedMatchList && this._cachedMatchListKey === cacheKey) {
+      return;
+    }
+
+    if (this._searchInProgress) {
+      this._searchCancelled = true;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    this._searchCancelled = false;
+    this._searchInProgress = true;
+
+    const allFiles = this.app.vault.getMarkdownFiles();
+    const searchLower = searchText.toLowerCase();
+    
+    const fileMap = new Map();
+    let totalAllDocMatches = 0;
+    
+    for (const file of allFiles) {
+      if (this._searchCancelled) {
+        this._searchInProgress = false;
+        return;
+      }
+      if (file.name.toLowerCase().includes(searchLower)) {
+        fileMap.set(file, [{ text: file.basename, level: 0, type: 'content' }]);
+        totalAllDocMatches += file.name.toLowerCase().split(searchLower).length - 1;
+      }
+      if (fileMap.size >= 50) break;
+    }
+
+    if (this.headingCacheBuilt && this.headingCache.size > 0) {
+      for (const file of allFiles) {
+        if (this._searchCancelled) {
+          this._searchInProgress = false;
+          return;
+        }
+        if (fileMap.has(file)) continue;
+        
+        const cachedData = this.headingCache.get(file.path);
+        if (!cachedData) continue;
+        
+        const matchedItems = [];
+        
+        if (cachedData.headings) {
+          const matchedHeadings = cachedData.headings.filter(h => h.text.toLowerCase().includes(searchLower));
+          matchedItems.push(...matchedHeadings.map(h => ({ text: h.text, level: h.level, type: 'heading' })));
+        }
+        
+        if (cachedData.tags) {
+          const matchedTags = cachedData.tags.filter(t => t.toLowerCase().includes(searchLower));
+          for (const tag of matchedTags) {
+            if (!matchedItems.some(m => m.text === tag && m.type === 'tag')) {
+              matchedItems.push({ text: tag, level: 0, type: 'tag' });
+            }
+          }
+        }
+        
+        if (matchedItems.length > 0) {
+          fileMap.set(file, matchedItems);
+          totalAllDocMatches += matchedItems.length;
+        }
+        
+        if (fileMap.size >= 50) break;
+      }
+    } else {
+      const remainingFiles = allFiles.filter(f => !fileMap.has(f));
+      
+      for (const file of remainingFiles) {
+        if (this._searchCancelled) {
+          this._searchInProgress = false;
+          return;
+        }
+        if (fileMap.size >= 50) break;
+        
+        try {
+          const content = await this.app.vault.cachedRead(file);
+          if (content && content.toLowerCase().includes(searchLower)) {
+            const lines = content.split('\n');
+            const headings = [];
+            const tags = [];
+            
+            for (const line of lines) {
+              const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
+              if (headingMatch) {
+                const level = headingMatch[1].length;
+                const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
+                if (headingText.toLowerCase().includes(searchLower)) {
+                  headings.push({ text: headingText, level: level, type: 'heading' });
+                }
+              }
+              
+              const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
+              let tagMatch;
+              while ((tagMatch = tagRegex.exec(line)) !== null) {
+                const tagText = tagMatch[1];
+                if (tagText && tagText.toLowerCase().includes(searchLower) && !this.isColorCode(tagText)) {
+                  if (!tags.includes(tagText)) {
+                    tags.push({ text: tagText, level: 0, type: 'tag' });
+                  }
+                }
+              }
+            }
+            
+            const matchedItems = [...headings, ...tags];
+            if (matchedItems.length > 0) {
+              fileMap.set(file, matchedItems);
+              totalAllDocMatches += matchedItems.length;
+            } else {
+              // Extract content snippets for body matches
+              const snippets = [];
+              for (let i = 0; i < lines.length && snippets.length < 3; i++) {
+                const lineLower = lines[i].toLowerCase();
+                const idx = lineLower.indexOf(searchLower);
+                if (idx !== -1) {
+                  const trimmed = lines[i].trim();
+                  if (trimmed.length > 0) {
+                    let snippet = trimmed;
+                    if (snippet.length > 120) {
+                      const matchIdx = snippet.toLowerCase().indexOf(searchLower);
+                      const start = Math.max(0, matchIdx - 30);
+                      const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+                      snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+                    }
+                    snippets.push(snippet);
+                  }
+                }
+              }
+              if (snippets.length > 0) {
+                fileMap.set(file, [{ text: file.basename, level: 0, type: 'content', snippets }]);
+                totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
+              } else {
+                fileMap.set(file, [{ text: file.basename, level: 0 }]);
+              }
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    this._searchInProgress = false;
+    this._cachedMatchList = fileMap;
+    this._cachedMatchListKey = cacheKey;
+    this._pendingMatchCount = totalAllDocMatches;
+    // Cache for recent search reuse
+    if (cacheKey && fileMap && fileMap.size > 0) {
+      this._recentSearchCaches[cacheKey] = { fileMap, matchCount: totalAllDocMatches };
+    }
+  }
+
+  showMatchListFromFloatingToggle() {
+    this._listUserDismissed = false;
+    this._exhaustiveSearchDone = false;
+    this._listTriggerElement = this.floatingToggleWrapper || null;
+    if (!this._cachedMatchList || !this._pendingSearchText) return;
+    this._pendingShowList = { searchText: this._pendingSearchText, matchCount: this._pendingMatchCount };
+    this.renderMatchList(this._cachedMatchList, this._pendingMatchCount, false);
+    this._listShownFromHover = true;
+    
+    // Position the list near the floating toggle
+    this.positionListNearFloatingToggle();
+    
+    // Add mouseleave handler to hide list when mouse leaves both list and toggle
+    if (!this._matchListHoverLeaveHandler) {
+      this._matchListHoverLeaveHandler = () => {
+        setTimeout(() => {
+          const listHovered = this.matchList && this.matchList.matches(':hover');
+          const toggleHovered = this.floatingToggle && this.floatingToggle.matches(':hover');
+          const toggleWrapperHovered = this.floatingToggleWrapper && this.floatingToggleWrapper.matches(':hover');
+          const previewHovered = this.previewPanel && this.previewPanel.matches(':hover');
+          const keywordBtnHovered = this._floatingKeywordButtons.some(b => b.wrapper.matches(':hover'));
+          if (!listHovered && !toggleHovered && !toggleWrapperHovered && !previewHovered && !keywordBtnHovered) {
+            this.hideMatchList();
+            this._listShownFromHover = false;
+          }
+        }, 300);
+      };
+      this.matchList.addEventListener('mouseleave', this._matchListHoverLeaveHandler);
+    }
+  }
+
+  showRecentSearchList() {
+    if (!this.matchList || this._recentSearches.length === 0) return;
+    
+    this.matchList.innerHTML = '';
+    
+    const header = document.createElement('div');
+    header.className = 'minimap-match-list-header';
+    header.addEventListener('mousedown', (e) => {
+      this.isInteractingWithList = true;
+    });
+    
+    const headerText = document.createElement('span');
+    headerText.className = 'minimap-match-list-header-text';
+    headerText.textContent = t('recentSearch');
+    header.appendChild(headerText);
+    this.matchList.appendChild(header);
+
+    // Recent searches section
+    const recentSection = document.createElement('div');
+    recentSection.className = 'minimap-match-list-recent';
+    recentSection.style.cssText = 'padding:6px 8px;overflow-y:auto;';
+
+    const recentItems = document.createElement('div');
+    recentItems.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+
+    const searchesToShow = this._recentSearches.slice(0, 10);
+    for (const term of searchesToShow) {
+      const chipWrapper = document.createElement('span');
+      chipWrapper.className = 'minimap-match-list-recent-chip';
+      chipWrapper.style.cssText = 'font-size:12px;padding:3px 8px 3px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--background-modifier-border);background:var(--background-secondary);color:var(--text-muted);white-space:nowrap;transition:background 0.15s,color 0.15s;position:relative;display:inline-flex;align-items:center;gap:3px;';
+      chipWrapper.textContent = term;
+
+      // Add pin/float button
+      const chipPin = document.createElement('span');
+      const isAlreadyFloating = this._floatingKeywordButtons.some(b => b.term === term);
+      chipPin.textContent = '📌';
+      chipPin.style.cssText = `font-size:9px;cursor:pointer;opacity:${isAlreadyFloating ? '1' : '0.3'};transition:opacity 0.15s;line-height:1;flex-shrink:0;`;
+      chipPin.title = isAlreadyFloating ? t('removeFloat') : t('floatThisWord');
+      chipPin.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.isInteractingWithList = true;
+      });
+      chipPin.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isFloating = this._floatingKeywordButtons.some(b => b.term === term);
+        if (isFloating) {
+          this.removeFloatingKeywordButton(term);
+          chipPin.style.opacity = '0.3';
+          chipPin.title = t('floatThisWord');
+        } else {
+          const cached = this._recentSearchCaches[term];
+          if (cached && cached.fileMap && cached.fileMap.size > 0) {
+            this.createFloatingKeywordButton(term, cached.fileMap, cached.matchCount);
+          } else {
+            this.createFloatingKeywordButton(term, new Map(), 0);
+          }
+          chipPin.style.opacity = '1';
+          chipPin.title = t('removeFloat');
+        }
+      });
+      chipWrapper.appendChild(chipPin);
+
+      chipWrapper.addEventListener('mousedown', (e) => {
+        if (e.target === chipPin) return;
+        e.stopPropagation();
+        this.isInteractingWithList = true;
+      });
+      chipWrapper.addEventListener('click', (e) => {
+        if (e.target === chipPin) return;
+        e.stopPropagation();
+        this.isInteractingWithList = true;
+        this._keepListVisible = true;
+        this.currentSelection = term;
+        this._listUserDismissed = false;
+        this._exhaustiveSearchDone = false;
+        // Try to use cached results for instant display
+        const cached = this._recentSearchCaches[term];
+        if (cached && cached.fileMap && cached.fileMap.size > 0) {
+          this._cachedMatchList = cached.fileMap;
+          this._cachedMatchListKey = term;
+          this._pendingMatchCount = cached.matchCount;
+          this._pendingSearchText = term;
+          this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
+          // Highlight in current document
+          this.highlightMatches();
+          // Render cached match list
+          this.renderMatchList(cached.fileMap, cached.matchCount, false);
+          this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
+        } else {
+          this.highlightMatches();
+        }
+        this._keepListVisible = false;
+      });
+      chip.addEventListener('mouseenter', () => {
+        chip.style.background = 'var(--background-modifier-hover)';
+        chip.style.color = 'var(--text-normal)';
+      });
+      chip.addEventListener('mouseleave', () => {
+        chip.style.background = 'var(--background-secondary)';
+        chip.style.color = 'var(--text-muted)';
+      });
+      recentItems.appendChild(chip);
+    }
+    recentSection.appendChild(recentItems);
+    this.matchList.appendChild(recentSection);
+
+    // Add resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'minimap-match-list-resize-handle';
+    this.matchList.appendChild(resizeHandle);
+
+    this.matchList.style.display = 'block';
+    this.matchList.style.opacity = this.listOpacity;
+    this._isListVisible = true;
+    this._listShownFromHover = true;
+    this.positionListNearFloatingToggle();
+
+    // Add mouseleave handler
+    if (!this._matchListHoverLeaveHandler) {
+      this._matchListHoverLeaveHandler = () => {
+        setTimeout(() => {
+          const listHovered = this.matchList && this.matchList.matches(':hover');
+          const toggleHovered = this.floatingToggle && this.floatingToggle.matches(':hover');
+          const toggleWrapperHovered = this.floatingToggleWrapper && this.floatingToggleWrapper.matches(':hover');
+          const previewHovered = this.previewPanel && this.previewPanel.matches(':hover');
+          const keywordBtnHovered = this._floatingKeywordButtons.some(b => b.wrapper.matches(':hover'));
+          if (!listHovered && !toggleHovered && !toggleWrapperHovered && !previewHovered && !keywordBtnHovered) {
+            this.hideMatchList();
+            this._listShownFromHover = false;
+          }
+        }, 300);
+      };
+      this.matchList.addEventListener('mouseleave', this._matchListHoverLeaveHandler);
+    }
+  }
+
+  async showMatchList(searchText, matchCount) {
+    if (!this.matchList) return;
+    if (!this.settings.enableSelectionMatch) return;
+
+    // Check word count limits before proceeding with background search
+    const wordLen = searchText ? searchText.length : 0;
+    const minWords = this.settings.searchWordCountMin ?? 0;
+    const maxWords = this.settings.searchWordCountMax ?? 0;
+    if (minWords > 0 && wordLen < minWords) return;
+    if (maxWords > 0 && wordLen > maxWords) return;
+
+    // Reset exhaustive search flag when search text changes
+    if (this._pendingSearchText !== searchText) {
+      this._exhaustiveSearchDone = false;
+    }
+
+    // Always cache data and update badge, never auto-show the list
+    this._pendingMatchCount = matchCount;
+    this._pendingSearchText = searchText;
+
+    // Record to recent searches
+    if (searchText && searchText.length > 0) {
+      const idx = this._recentSearches.indexOf(searchText);
+      if (idx >= 0) this._recentSearches.splice(idx, 1);
+      this._recentSearches.unshift(searchText);
+      if (this._recentSearches.length > 10) {
+        const removed = this._recentSearches.pop();
+        delete this._recentSearchCaches[removed];
+      }
+    }
+
+    // When list is pinned to a specific search text
+    if (this._listPinnedSearchText && this._listPinnedSearchText !== searchText) {
+      if (this.settings.exhaustiveMode) {
+        this.performExhaustiveSearch(searchText, matchCount, null);
+      } else {
+        this._performMatchListSearch(searchText, matchCount, true).then(() => {
+          const docCount = this._cachedMatchList ? this._cachedMatchList.size : 0;
+          this.updateFloatingToggleBadge(docCount, matchCount);
+        });
+      }
+      return;
+    }
+
+    // In exhaustive mode, skip heading cache and use full-text search directly
+    if (this.settings.exhaustiveMode) {
+      if (!this._exhaustiveSearchDone) {
+        this._exhaustiveSearchDone = true;
+        this.performExhaustiveSearch(searchText, matchCount, null);
+      }
+      return;
+    }
+
+    // Perform search in background, update badge with doc count
+    const cacheKey = searchText;
+
+    const savedData = this.savedMatchLists.find(m => m.selection === searchText);
+    if (savedData && savedData.pinned && savedData.fileMapData) {
+      const fileMap = await this.deserializeFileMap(savedData.fileMapData);
+      if (fileMap && fileMap.size > 0) {
+        this._pendingShowList = { searchText, matchCount };
+        this._cachedMatchList = fileMap;
+        this._cachedMatchListKey = cacheKey;
+        this._recentSearchCaches[searchText] = { fileMap, matchCount };
+        this.updateFloatingToggleBadge(fileMap.size, matchCount);
+        // If list is already visible, refresh it
+        if (this._isListVisible) {
+          this.renderMatchList(fileMap, matchCount, false);
+        }
+        return;
+      }
+    }
+
+    if (this._cachedMatchList && this._cachedMatchListKey === cacheKey) {
+      this._pendingShowList = { searchText, matchCount };
+      this.updateFloatingToggleBadge(this._cachedMatchList.size, matchCount);
+      // If list is already visible, refresh it
+      if (this._isListVisible) {
+        this.renderMatchList(this._cachedMatchList, matchCount, false);
+      }
+      return;
+    }
+
+    if (this._searchInProgress) {
+      this._searchCancelled = true;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    this._searchCancelled = false;
+    this._searchInProgress = true;
+    this._pendingShowList = { searchText, matchCount };
+
+    const allFiles = this.app.vault.getMarkdownFiles();
+    const searchLower = searchText.toLowerCase();
+    
+    const fileMap = new Map();
+    let totalAllDocMatches = 0;
+    
+    for (const file of allFiles) {
+      if (this._searchCancelled) {
+        this._searchInProgress = false;
+        return;
+      }
+      if (file.name.toLowerCase().includes(searchLower)) {
+        fileMap.set(file, [{ text: file.basename, level: 0, type: 'content' }]);
+        totalAllDocMatches += file.name.toLowerCase().split(searchLower).length - 1;
+      }
+      if (fileMap.size >= 50) break;
+    }
+
+    if (fileMap.size > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
+      this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+      if (this._isListVisible) {
+        this.renderMatchList(fileMap, matchCount, false);
+      }
+    }
+
+    if (this.headingCacheBuilt && this.headingCache.size > 0) {
+      for (const file of allFiles) {
+        if (this._searchCancelled) {
+          this._searchInProgress = false;
+          return;
+        }
+        if (fileMap.has(file)) continue;
+        
+        const cachedData = this.headingCache.get(file.path);
+        if (!cachedData) continue;
+        
+        const matchedItems = [];
+        
+        if (cachedData.headings) {
+          const matchedHeadings = cachedData.headings.filter(h => h.text.toLowerCase().includes(searchLower));
+          matchedItems.push(...matchedHeadings.map(h => ({ text: h.text, level: h.level, type: 'heading' })));
+        }
+        
+        if (cachedData.tags) {
+          const matchedTags = cachedData.tags.filter(t => t.toLowerCase().includes(searchLower));
+          for (const tag of matchedTags) {
+            if (!matchedItems.some(m => m.text === tag && m.type === 'tag')) {
+              matchedItems.push({ text: tag, level: 0, type: 'tag' });
+            }
+          }
+        }
+        
+        if (matchedItems.length > 0) {
+          fileMap.set(file, matchedItems);
+          // Count total matches in this file from cache
+          const cachedContent = this.headingCache.get(file.path);
+          if (cachedContent && cachedContent.content) {
+            totalAllDocMatches += cachedContent.content.toLowerCase().split(searchLower).length - 1;
+          } else {
+            totalAllDocMatches += matchedItems.length;
+          }
+          
+          if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
+            this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+            if (this._isListVisible) {
+              const isFirstMatch = fileMap.size === 1;
+              this.renderMatchList(fileMap, matchCount, !isFirstMatch);
+            }
+          }
+        }
+        
+        if (fileMap.size >= 50) break;
+      }
+    } else {
+      const remainingFiles = allFiles.filter(f => !fileMap.has(f));
+      
+      for (const file of remainingFiles) {
+        if (this._searchCancelled) {
+          this._searchInProgress = false;
+          return;
+        }
+        try {
+          const content = await this.app.vault.read(file);
+          const lines = content.split('\n');
+          const matchedItems = [];
+          
+          for (const line of lines) {
+            if (this._searchCancelled) {
+              this._searchInProgress = false;
+              return;
+            }
+            const headingMatch = line.match(/^(#{1,6})\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
+              if (headingText.toLowerCase().includes(searchLower)) {
+                matchedItems.push({ text: headingText, level: level, type: 'heading' });
+              }
+            }
+            
+            const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][\w\u4e00-\u9fa5\-\/]*)/g;
+            let tagMatch;
+            while ((tagMatch = tagRegex.exec(line)) !== null) {
+              const tagText = tagMatch[1];
+              if (tagText && !this.isColorCode(tagText) && tagText.toLowerCase().includes(searchLower)) {
+                if (!matchedItems.some(m => m.text === tagText && m.type === 'tag')) {
+                  matchedItems.push({ text: tagText, level: 0, type: 'tag' });
+                }
+              }
+            }
+          }
+          
+          if (matchedItems.length > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
+            fileMap.set(file, matchedItems);
+            totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
+            this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+            if (this._isListVisible) {
+              const isFirstMatch = fileMap.size === 1;
+              this.renderMatchList(fileMap, matchCount, !isFirstMatch);
+            }
+          } else if (content.toLowerCase().includes(searchLower)) {
+            // No heading/tag matches but body content matches - extract snippets
+            const snippets = [];
+            for (let i = 0; i < lines.length && snippets.length < 3; i++) {
+              const lineLower = lines[i].toLowerCase();
+              const idx = lineLower.indexOf(searchLower);
+              if (idx !== -1) {
+                const trimmed = lines[i].trim();
+                if (trimmed.length > 0) {
+                  let snippet = trimmed;
+                  if (snippet.length > 120) {
+                    const matchIdx = snippet.toLowerCase().indexOf(searchLower);
+                    const start = Math.max(0, matchIdx - 30);
+                    const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+                    snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+                  }
+                  snippets.push(snippet);
+                }
+              }
+            }
+            if (snippets.length > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
+              fileMap.set(file, [{ text: file.basename, level: 0, type: 'content', snippets }]);
+              totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
+              this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+              if (this._isListVisible) {
+                const isFirstMatch = fileMap.size === 1;
+                this.renderMatchList(fileMap, matchCount, !isFirstMatch);
+              }
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+        
+        if (fileMap.size >= 50) break;
+      }
+    }
+
+    if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
+      this._cachedMatchList = fileMap;
+      this._cachedMatchListKey = cacheKey;
+      this._recentSearchCaches[searchText] = { fileMap, matchCount };
+      
+      await this.saveMatchListData(searchText, fileMap, matchCount);
+    }
+
+    this._searchInProgress = false;
+    this._pendingMatchCount = totalAllDocMatches;
+    return fileMap;
+  }
+
+  async saveMatchListData(selection, fileMap, matchCount) {
+    const fileMapData = await this.serializeFileMap(fileMap);
+    
+    const existingIndex = this.savedMatchLists.findIndex(m => m.selection === selection);
+    
+    const matchData = {
+      selection: selection,
+      matchCount: matchCount,
+      fileMapData: fileMapData,
+      timestamp: Date.now()
+    };
+
+    if (existingIndex >= 0) {
+      this.savedMatchLists[existingIndex] = matchData;
+    } else {
+      this.savedMatchLists.unshift(matchData);
+      if (this.savedMatchLists.length > 100) {
+        this.savedMatchLists = this.savedMatchLists.slice(0, 100);
+      }
+    }
+
+    this.saveListData();
+  }
+
+  async serializeFileMap(fileMap) {
+    const data = [];
+    for (const [file, headings] of fileMap) {
+      data.push({
+        path: file.path,
+        basename: file.basename,
+        headings: headings
+      });
+    }
+    return data;
+  }
+
+  async deserializeFileMap(data) {
+    const fileMap = new Map();
+    const allFiles = this.app.vault.getMarkdownFiles();
+    
+    for (const item of data) {
+      const file = allFiles.find(f => f.path === item.path);
+      if (file) {
+        fileMap.set(file, item.headings);
+      }
+    }
+    
+    return fileMap;
+  }
+
+  cancelSearch() {
+    this._searchCancelled = true;
+  }
+
+  async performExhaustiveSearch(searchText, matchCount, headerTextEl) {
+    const fileMap = new Map();
+    const searchLower = searchText.toLowerCase();
+    let totalAllDocMatches = 0;
+
+    // Helper: extract context snippets around matches
+    const extractSnippets = (content, searchLower, maxSnippets = 3) => {
+      const lines = content.split('\n');
+      const snippets = [];
+      for (let i = 0; i < lines.length && snippets.length < maxSnippets; i++) {
+        const lineLower = lines[i].toLowerCase();
+        const idx = lineLower.indexOf(searchLower);
+        if (idx !== -1) {
+          const trimmed = lines[i].trim();
+          if (trimmed.length > 0) {
+            // Truncate long lines, showing context around the match
+            let snippet = trimmed;
+            if (snippet.length > 120) {
+              const matchIdx = snippet.toLowerCase().indexOf(searchLower);
+              const start = Math.max(0, matchIdx - 30);
+              const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+              snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+            }
+            snippets.push(snippet);
+          }
+        }
+      }
+      return snippets;
+    };
+
+    // Try Obsidian built-in search API first
+    try {
+      const searchPlugin = this.app.internalPlugins.plugins['search'];
+      if (searchPlugin && searchPlugin.instance) {
+        const rawResults = searchPlugin.instance.search(searchText);
+        if (rawResults) {
+          for (const result of rawResults) {
+            const file = this.app.vault.getAbstractFileByPath(result.path);
+            if (file && file.extension === 'md') {
+              const items = [];
+              if (result.matches) {
+                for (const m of result.matches) {
+                  const snippetText = m.match || searchText;
+                  items.push({ text: snippetText, level: 0, type: 'content', snippet: snippetText });
+                }
+              }
+              if (items.length === 0) {
+                items.push({ text: file.basename, level: 0 });
+              }
+              totalAllDocMatches += result.matches ? result.matches.length : 1;
+              fileMap.set(file, items);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback to manual search if API fails
+    }
+
+    // Fallback: manual full-text search using cachedRead with snippet extraction
+    if (fileMap.size === 0) {
+      const allFiles = this.app.vault.getMarkdownFiles();
+      for (const file of allFiles) {
+        try {
+          const nameMatch = file.name.toLowerCase().includes(searchLower);
+          const content = await this.app.vault.cachedRead(file);
+          const contentMatch = content && content.toLowerCase().includes(searchLower);
+          if (nameMatch || contentMatch) {
+            const snippets = contentMatch ? extractSnippets(content, searchLower) : [];
+            const items = [{ text: file.basename, level: 0, type: 'content' }];
+            if (snippets.length > 0) {
+              items[0].snippets = snippets;
+            }
+            totalAllDocMatches += contentMatch ? (content.toLowerCase().split(searchLower).length - 1) : 1;
+            fileMap.set(file, items);
+          }
+        } catch (e) {
+          continue;
+        }
+        if (fileMap.size >= 200) break;
+      }
+    }
+
+    // Enhance existing results with snippets if they don't have them
+    if (fileMap.size > 0) {
+      for (const [file, items] of fileMap) {
+        const hasContentSnippets = items.some(item => item.type === 'content' && (item.snippet || item.snippets));
+        if (!hasContentSnippets) {
+          try {
+            const content = await this.app.vault.cachedRead(file);
+            if (content) {
+              const snippets = extractSnippets(content, searchLower);
+              for (const item of items) {
+                if (item.type === 'content' && !item.snippet && !item.snippets) {
+                  item.snippets = snippets;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            // skip
+          }
+        }
+      }
+    }
+
+    // Cache results and update badge
+    this._cachedMatchList = fileMap;
+    this._cachedMatchListKey = searchText;
+    this._pendingShowList = { searchText, matchCount };
+    this._pendingMatchCount = totalAllDocMatches;
+    this._recentSearchCaches[searchText] = { fileMap, matchCount: totalAllDocMatches };
+    this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+
+    // If list is already visible, refresh it
+    if (this._isListVisible) {
+      this.renderMatchList(fileMap, matchCount, false);
+    }
+  }
+
+  renderMatchList(fileMap, matchCount, append = false) {
+    const searchText = this._pendingShowList?.searchText || '';
+
+    if (fileMap.size === 0) {
+      this.matchList.style.display = 'none';
+      return;
+    }
+
+    if (!this._pendingShowList) {
+      return;
+    }
+
+    if (!append) {
+      // Preserve resize handle and scroll position when clearing
+      const existingResizeHandle = this.matchList.querySelector('.minimap-match-list-resize-handle');
+      const listContainer = this.matchList.querySelector('.minimap-match-list-container');
+      const savedScrollTop = listContainer ? listContainer.scrollTop : 0;
+      this.matchList.innerHTML = '';
+      if (existingResizeHandle) {
+        this.matchList.appendChild(existingResizeHandle);
+      }
+      // Store scroll position to restore after rebuild
+      this._savedListScrollTop = savedScrollTop;
+      
+      const header = document.createElement('div');
+      header.className = 'minimap-match-list-header';
+      header.addEventListener('mousedown', (e) => {
+        this.isInteractingWithList = true;
+      });
+      
+      const headerText = document.createElement('span');
+      headerText.className = 'minimap-match-list-header-text';
+      const totalMatchCount = this._pendingMatchCount || matchCount;
+      headerText.textContent = this.settings.exhaustiveMode
+        ? t('exhaustiveMatch', fileMap.size, totalMatchCount)
+        : t('libraryMatch', fileMap.size, totalMatchCount);
+      header.appendChild(headerText);
+      
+      // Mark/pin toggle removed per user request
+      
+      // Add save/export button
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'minimap-match-list-save-btn';
+      saveBtn.textContent = t('save');
+      saveBtn.style.cssText = 'margin-left:8px;padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid var(--background-modifier-border);border-radius:3px;background:var(--background-secondary);color:var(--text-muted);transition:color 0.15s,background 0.15s;flex-shrink:0;';
+      saveBtn.title = t('exportMarkdown');
+      saveBtn.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        this.isInteractingWithList = true;
+      });
+      saveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.exportMatchList(fileMap, searchText, matchCount);
+      });
+      saveBtn.addEventListener('mouseenter', () => {
+        saveBtn.style.color = 'var(--text-normal)';
+        saveBtn.style.background = 'var(--background-modifier-hover)';
+      });
+      saveBtn.addEventListener('mouseleave', () => {
+        saveBtn.style.color = 'var(--text-muted)';
+        saveBtn.style.background = 'var(--background-secondary)';
+      });
+      header.appendChild(saveBtn);
+      
+      this.matchList.appendChild(header);
+
+      // Recent searches section in header
+      const recentSection = document.createElement('div');
+      recentSection.className = 'minimap-match-list-recent';
+      recentSection.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);max-height:80px;overflow-y:auto;';
+
+      const recentLabel = document.createElement('div');
+      recentLabel.style.cssText = 'font-size:10px;color:var(--text-faint);margin-bottom:2px;';
+      recentLabel.textContent = t('recentSearch');
+      recentSection.appendChild(recentLabel);
+
+      const recentItems = document.createElement('div');
+      recentItems.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+
+      const searchesToShow = this._recentSearches.slice(0, 10);
+      for (const term of searchesToShow) {
+        const chip = document.createElement('span');
+        chip.className = 'minimap-match-list-recent-chip';
+        const isCurrentSearch = term === searchText;
+        chip.style.cssText = `font-size:11px;padding:1px 6px;border-radius:8px;cursor:pointer;border:1px solid ${isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};background:${isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-secondary)'};color:${isCurrentSearch ? 'var(--text-on-accent)' : 'var(--text-muted)'};white-space:nowrap;transition:background 0.15s,color 0.15s;display:inline-flex;align-items:center;gap:3px;`;
+        chip.textContent = term;
+
+        // Add pin/float button
+        const chipPin = document.createElement('span');
+        const isAlreadyFloating = this._floatingKeywordButtons.some(b => b.term === term);
+        chipPin.textContent = '📌';
+        chipPin.style.cssText = `font-size:9px;cursor:pointer;opacity:${isAlreadyFloating ? '1' : '0.3'};transition:opacity 0.15s;line-height:1;flex-shrink:0;`;
+        chipPin.title = isAlreadyFloating ? t('removeFloat') : t('floatThisWord');
+        chipPin.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          this.isInteractingWithList = true;
+        });
+        chipPin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const isFloating = this._floatingKeywordButtons.some(b => b.term === term);
+          if (isFloating) {
+            this.removeFloatingKeywordButton(term);
+            chipPin.style.opacity = '0.3';
+            chipPin.title = t('floatThisWord');
+          } else {
+            const cached = this._recentSearchCaches[term];
+            if (cached && cached.fileMap && cached.fileMap.size > 0) {
+              this.createFloatingKeywordButton(term, cached.fileMap, cached.matchCount);
+            } else {
+              this.createFloatingKeywordButton(term, new Map(), 0);
+            }
+            chipPin.style.opacity = '1';
+            chipPin.title = t('removeFloat');
+          }
+        });
+        chip.appendChild(chipPin);
+
+        chip.addEventListener('mousedown', (e) => {
+          if (e.target === chipPin) return;
+          e.stopPropagation();
+          this.isInteractingWithList = true;
+        });
+        chip.addEventListener('click', (e) => {
+          if (e.target === chipPin) return;
+          e.stopPropagation();
+          this.isInteractingWithList = true;
+          // Keep list visible during search transition
+          this._keepListVisible = true;
+          this.currentSelection = term;
+          this._listUserDismissed = false;
+          this._exhaustiveSearchDone = false;
+          // Try to use cached results for instant display
+          const cached = this._recentSearchCaches[term];
+          if (cached && cached.fileMap && cached.fileMap.size > 0) {
+            this._cachedMatchList = cached.fileMap;
+            this._cachedMatchListKey = term;
+            this._pendingMatchCount = cached.matchCount;
+            this._pendingSearchText = term;
+            this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
+            // Highlight in current document
+            this.highlightMatches();
+            // Render cached match list
+            this.renderMatchList(cached.fileMap, cached.matchCount, false);
+            this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
+          } else {
+            this.highlightMatches();
+          }
+          this._keepListVisible = false;
+        });
+        chip.addEventListener('mouseenter', () => {
+          if (!isCurrentSearch) {
+            chip.style.background = 'var(--background-modifier-hover)';
+            chip.style.color = 'var(--text-normal)';
+          }
+        });
+        chip.addEventListener('mouseleave', () => {
+          if (!isCurrentSearch) {
+            chip.style.background = 'var(--background-secondary)';
+            chip.style.color = 'var(--text-muted)';
+          }
+        });
+        recentItems.appendChild(chip);
+      }
+      recentSection.appendChild(recentItems);
+      this.matchList.appendChild(recentSection);
+
+      const newContainer = document.createElement('div');
+      newContainer.className = 'minimap-match-list-container';
+      this.matchList.appendChild(newContainer);
+    }
+
+    const listContainer = this.matchList.querySelector('.minimap-match-list-container');
+    if (!listContainer) return;
+
+    const existingPaths = new Set();
+    listContainer.querySelectorAll('.swift-match-group').forEach(el => {
+      existingPaths.add(el.dataset.filePath);
+    });
+
+    // 文件颜色方案（不同文件用不同色相）
+    const fileHues = [210, 30, 150, 340, 270, 60, 180, 90];
+    let globalFileIndex = existingPaths.size;
+
+    fileMap.forEach((items, file) => {
+      if (existingPaths.has(file.path)) return;
+
+      const fileHue = fileHues[globalFileIndex % fileHues.length];
+      const fileNameBg = `hsl(${fileHue},50%,90%)`;
+      const fileNameColor = `hsl(${fileHue},50%,35%)`;
+      const dotColor = `hsl(${fileHue},50%,50%)`;
+
+      // 文件分组容器
+      const groupEl = document.createElement('div');
+      groupEl.className = 'swift-match-group';
+      groupEl.dataset.filePath = file.path;
+      groupEl.style.cssText = globalFileIndex > existingPaths.size
+        ? 'margin-top:8px;padding-top:8px;border-top:1px solid var(--background-modifier-border);'
+        : '';
+
+      // 分组标题栏：文件名
+      const headerEl = document.createElement('div');
+      headerEl.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;';
+
+      const fileNameEl = document.createElement('span');
+      fileNameEl.textContent = file.path;
+      fileNameEl.style.cssText = `font-size:12px;font-weight:600;color:${fileNameColor};background:${fileNameBg};padding:2px 8px;border-radius:10px;flex-shrink:0;white-space:nowrap;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;`;
+      fileNameEl.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.isInteractingWithList = true;
+        if (e.button === 1) {
+          this.closePreview();
+          this.hideMatchList();
+          this.openFileInNewTab(file, true);
+          setTimeout(() => {
+            if (searchText) this.jumpToSearchTextInEditor(searchText);
+          }, 500);
+        } else if (e.button === 0) {
+          this.showPreview(file);
+        }
+      });
+      headerEl.appendChild(fileNameEl);
+      groupEl.appendChild(headerEl);
+
+      // 分组内容区
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'swift-match-group-body';
+
+      items.forEach((item, i) => {
+        // 将 content 类型的 snippets 拆分为独立条目
+        let matchEntries = [];
+        if (item.type === 'content' && (item.snippet || (item.snippets && item.snippets.length > 0))) {
+          const contentSnippets = item.snippets || (item.snippet ? [item.snippet] : []);
+          for (const snippetText of contentSnippets) {
+            matchEntries.push({ text: snippetText, isMarkdown: true, type: 'content' });
+          }
+        } else if (item.type === 'tag') {
+          matchEntries.push({ text: `#${item.text}`, isMarkdown: false, type: 'tag' });
+        } else if (item.level > 0) {
+          matchEntries.push({ text: item.text, isMarkdown: true, type: 'heading' });
+        } else {
+          matchEntries.push({ text: item.text || '', isMarkdown: true, type: 'other' });
+        }
+
+        matchEntries.forEach((entry, entryIdx) => {
+          // 同一组内多条匹配用横线隔开
+          if (i > 0 || entryIdx > 0) {
+            const prevEntry = entryIdx === 0 ? null : matchEntries[entryIdx - 1];
+            // 如果是第一条（i=0且entryIdx=0）不加分隔线
+            if (!(i === 0 && entryIdx === 0)) {
+              const innerDivider = document.createElement('div');
+              innerDivider.style.cssText = 'border-top:1px solid var(--background-modifier-border);margin:4px 0;';
+              bodyEl.appendChild(innerDivider);
+            }
+          }
+
+          // 圆点 + 文本内容
+          const itemWrapper = document.createElement('div');
+          itemWrapper.style.cssText = 'display:flex;align-items:flex-start;gap:6px;';
+
+          const dot = document.createElement('span');
+          dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:5px;`;
+          itemWrapper.appendChild(dot);
+
+          const itemBox = document.createElement('div');
+          itemBox.style.cssText = 'flex:1;min-width:0;overflow:hidden;';
+
+          // 文本内容
+          const textEl = document.createElement('div');
+          textEl.className = 'swift-match-card-text';
+          textEl.style.cssText = 'font-size:12px;overflow:hidden;cursor:text;user-select:text;';
+
+          if (entry.isMarkdown && entry.text) {
+            MarkdownRenderer.renderMarkdown(
+              entry.text,
+              textEl,
+              file.path,
+              this
+            ).then(() => {
+              const renderedContent = textEl.querySelector('p');
+              if (renderedContent) {
+                textEl.innerHTML = renderedContent.innerHTML;
+              }
+            });
+          } else {
+            textEl.textContent = entry.text;
+          }
+
+          itemBox.appendChild(textEl);
+
+        // 底部工具栏：复制 + 打开文档
+          const toolBar = document.createElement('div');
+          toolBar.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:2px;';
+
+          // 复制按钮
+          const copyBtn = document.createElement('button');
+          copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+          copyBtn.title = t('copy');
+          copyBtn.style.cssText = 'padding:1px 4px;cursor:pointer;border:none;box-shadow:0 0 0 0.5px var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-muted);display:flex;align-items:center;justify-content:center;height:18px;line-height:0;';
+          copyBtn.addEventListener('click', (ce) => {
+            ce.preventDefault();
+            ce.stopPropagation();
+            const textToCopy = entry.text || '';
+            navigator.clipboard.writeText(textToCopy).then(() => {
+              copyBtn.style.color = 'var(--text-normal)';
+              setTimeout(() => { copyBtn.style.color = 'var(--text-muted)'; }, 800);
+            });
+          });
+          copyBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.isInteractingWithList = true; });
+          toolBar.appendChild(copyBtn);
+
+          // 打开文档按钮
+          const openBtn = document.createElement('button');
+          openBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="16.5" cy="16.5" r="2.5"/><path d="M18.5 18.5L21 21"/></svg>';
+          openBtn.title = t('openDoc');
+          openBtn.style.cssText = 'padding:1px 4px;cursor:pointer;border:none;box-shadow:0 0 0 0.5px var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-muted);display:flex;align-items:center;justify-content:center;height:18px;line-height:0;';
+          openBtn.addEventListener('click', async (ce) => {
+            ce.preventDefault();
+            ce.stopPropagation();
+            this.closePreview();
+            this.hideMatchList();
+            const jumpSearchText = searchText;
+            if (item.level > 0 && item.text) {
+              this.openFileInNewTabWithHeading(file, item.text, true);
+              setTimeout(() => {
+                this.currentSelection = jumpSearchText;
+                this.highlightMatches();
+              }, 1200);
+            } else if (item.type === 'tag') {
+              this.openFileInNewTab(file, true);
+              setTimeout(() => { this.jumpToTagInEditor(item.text); }, 1200);
+            } else {
+              const firstSentence = this.getFirstSentence(entry.text);
+              const jumpText = firstSentence || searchText;
+              this.openFileInNewTab(file, true);
+              setTimeout(() => {
+                this.currentSelection = jumpSearchText;
+                this.highlightMatches();
+                if (jumpText) this.jumpToSearchTextInEditor(jumpText);
+              }, 1200);
+            }
+          });
+          openBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.isInteractingWithList = true; });
+          toolBar.appendChild(openBtn);
+
+
+          itemBox.appendChild(toolBar);
+          itemWrapper.appendChild(itemBox);
+          bodyEl.appendChild(itemWrapper);
+        }); // end matchEntries.forEach
+      }); // end items.forEach
+
+      groupEl.appendChild(bodyEl);
+      listContainer.appendChild(groupEl);
+      globalFileIndex++;
+    });
+
+    this.matchList.style.display = 'block';
+    this.matchList.style.opacity = this.listOpacity;
+    this._isListVisible = true;
+
+    // Apply saved match list size
+    const savedWidth = this.matchListSize.width || this.settings.matchListWidth;
+    const maxSavedHeight = this.matchListSize.height || this.settings.matchListHeight;
+    this.matchList.style.width = `${savedWidth}px`;
+    this.matchList.style.maxWidth = `${savedWidth}px`;
+    
+    // Update container max-height to fit within the list
+    const sizeHeader = this.matchList.querySelector('.minimap-match-list-header');
+    const sizeListContainer = this.matchList.querySelector('.minimap-match-list-container');
+    if (sizeListContainer) {
+      const headerHeight = sizeHeader ? sizeHeader.offsetHeight : 36;
+      const recentSection = this.matchList.querySelector('.minimap-match-list-recent');
+      const recentHeight = recentSection ? recentSection.offsetHeight : 0;
+      const containerMaxHeight = maxSavedHeight - headerHeight - recentHeight - 14;
+      sizeListContainer.style.maxHeight = `${Math.max(50, containerMaxHeight)}px`;
+      // Auto-adjust list height: fit content but not exceed maxSavedHeight
+      requestAnimationFrame(() => {
+        const contentHeight = sizeListContainer.scrollHeight;
+        const autoHeight = Math.min(contentHeight + headerHeight + recentHeight + 14, maxSavedHeight);
+        this.matchList.style.height = `${autoHeight}px`;
+        const termScrollPos = searchText ? (this._listScrollPositions[searchText] || 0) : 0;
+        const scrollTopToRestore = this._savedListScrollTop || termScrollPos || this._matchListScrollTop;
+        if (scrollTopToRestore) {
+          sizeListContainer.scrollTop = scrollTopToRestore;
+          this._savedListScrollTop = 0;
+          this._matchListScrollTop = 0;
+        }
+      });
+    }
+
+    // Ensure resize handle exists
+    if (!this.matchList.querySelector('.minimap-match-list-resize-handle')) {
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'minimap-match-list-resize-handle';
+      this.matchList.appendChild(resizeHandle);
+
+      resizeHandle.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        this.isResizingMatchList = true;
+        this.isInteractingWithList = true;
+        this.resizeStartX = e.clientX;
+        this.resizeStartY = e.clientY;
+        this.resizeStartWidth = this.matchList.offsetWidth;
+        this.resizeStartHeight = this.matchList.offsetHeight;
+      });
+    }
+
+    // Auto-trigger exhaustive search if mode is on and not already exhaustive
+    if (this.settings.exhaustiveMode && searchText && !this._exhaustiveSearchDone) {
+      this._exhaustiveSearchDone = true;
+      const headerTextEl = this.matchList.querySelector('.minimap-match-list-header-text');
+      setTimeout(() => {
+        this.performExhaustiveSearch(searchText, matchCount, headerTextEl);
+      }, 0);
+    }
+
+    if (!append && !this.isPreviewOpen) {
+      // Position near trigger element (keyword btn) if available, otherwise near floating toggle
+      if (this._listTriggerElement && this._listTriggerElement.parentNode) {
+        this.positionListNearElement(this._listTriggerElement);
+      } else {
+        this.positionListNearFloatingToggle();
+      }
+      
+      if (this._matchListPositionUpdater) {
+        window.removeEventListener('resize', this._matchListPositionUpdater);
+      }
+      this._matchListPositionUpdater = () => {
+        if (this.matchList && this.matchList.style.display !== 'none' && !this.isPreviewOpen) {
+          if (this._listTriggerElement && this._listTriggerElement.parentNode) {
+            this.positionListNearElement(this._listTriggerElement);
+          } else {
+            this.positionListNearFloatingToggle();
+          }
+        }
+      };
+      window.addEventListener('resize', this._matchListPositionUpdater);
+    } else if (this.isPreviewOpen) {
+      if (this.listFixedPosition.left !== null && this.listFixedPosition.top !== null) {
+        this.matchList.style.left = `${this.listFixedPosition.left}px`;
+        this.matchList.style.top = `${this.listFixedPosition.top}px`;
+      }
+    }
+  }
+
+  async openFileInNewTabWithHeading(file, heading, setActive = true) {
+    const currentLeaf = this.app.workspace.activeLeaf;
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.openFile(file, { setActive });
+    
+    setTimeout(() => {
+      this.jumpToHeadingInEditor(heading);
+    }, 500);
+    
+    if (!setActive && currentLeaf) {
+      this.app.workspace.setActiveLeaf(currentLeaf, { focus: true });
+    }
+  }
+
+  async showPreviewWithHeading(file, heading) {
+    if (!this.previewPanel) return;
+
+    console.time('showPreviewWithHeading');
+    this.cancelSearch();
+    console.timeLog('showPreviewWithHeading', 'cancelSearch done');
+
+    const wasPreviewOpen = this.isPreviewOpen;
+    
+    this.isPreviewOpen = true;
+    this.currentPreviewFile = file;
+    this.currentPreviewHeading = heading;
+    this.previewSourceLeaf = this.app.workspace.activeLeaf;
+    
+    if (!wasPreviewOpen) {
+      if (this.previewListPosition.left !== null && this.previewListPosition.top !== null) {
+        this.listFixedPosition.left = this.previewListPosition.left;
+        this.listFixedPosition.top = this.previewListPosition.top;
+        this.matchList.style.left = `${this.previewListPosition.left}px`;
+        this.matchList.style.top = `${this.previewListPosition.top}px`;
+      } else if (this.listFixedPosition.left !== null && this.listFixedPosition.top !== null) {
+        this.matchList.style.left = `${this.listFixedPosition.left}px`;
+        this.matchList.style.top = `${this.listFixedPosition.top}px`;
+      }
+    }
+    
+    if (this._matchListPositionUpdater) {
+      window.removeEventListener('resize', this._matchListPositionUpdater);
+      this._matchListPositionUpdater = null;
+    }
+    
+    if (this._previewOutsideClickHandler) {
+      document.removeEventListener('mousedown', this._previewOutsideClickHandler);
+      this._previewOutsideClickHandler = null;
+    }
+    
+    try {
+      console.time('readFile');
+      const content = await this.app.vault.read(file);
+      console.timeEnd('readFile');
+      
+      console.time('buildDOM');
+      this.previewPanel.innerHTML = '';
+      
+      const header = document.createElement('div');
+      header.className = 'minimap-preview-header';
+      header.innerHTML = `
+        <span class="minimap-preview-title">${file.basename}</span>
+      `;
+      header.style.cursor = 'move';
+      header.style.userSelect = 'none';
+      
+      let isDraggingPanel = false;
+      let panelDragStartX, panelDragStartY, panelDragStartLeft, panelDragStartTop;
+      
+      const onPanelDragMouseDown = (e) => {
+        if (e.target.closest('.minimap-preview-resize-handle')) return;
+        isDraggingPanel = true;
+        panelDragStartX = e.clientX;
+        panelDragStartY = e.clientY;
+        const panelRect = this.previewPanel.getBoundingClientRect();
+        panelDragStartLeft = panelRect.left;
+        panelDragStartTop = panelRect.top;
+        document.addEventListener('mousemove', onPanelDragMouseMove);
+        document.addEventListener('mouseup', onPanelDragMouseUp);
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      
+      const onPanelDragMouseMove = (e) => {
+        if (!isDraggingPanel) return;
+        const dx = e.clientX - panelDragStartX;
+        const dy = e.clientY - panelDragStartY;
+        let newLeft = panelDragStartLeft + dx;
+        let newTop = panelDragStartTop + dy;
+        newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - 100));
+        newTop = Math.max(0, Math.min(newTop, window.innerHeight - 50));
+        this.previewPanel.style.left = `${newLeft}px`;
+        this.previewPanel.style.top = `${newTop}px`;
+      };
+      
+      const onPanelDragMouseUp = () => {
+        isDraggingPanel = false;
+        document.removeEventListener('mousemove', onPanelDragMouseMove);
+        document.removeEventListener('mouseup', onPanelDragMouseUp);
+      };
+      
+      header.addEventListener('mousedown', onPanelDragMouseDown);
+      
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'minimap-preview-content markdown-preview-view';
+      
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'minimap-preview-resize-handle';
+      resizeHandle.style.cssText = `
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 15px;
+        height: 15px;
+        cursor: nwse-resize;
+        z-index: 10;
+        background: linear-gradient(135deg, transparent 50%, var(--text-muted) 50%);
+      `;
+      
+      let isResizing = false;
+      let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
+      
+      const onResizeMouseDown = (e) => {
+        isResizing = true;
+        resizeStartX = e.clientX;
+        resizeStartY = e.clientY;
+        resizeStartWidth = this.previewPanel.offsetWidth;
+        resizeStartHeight = this.previewPanel.offsetHeight;
+        document.addEventListener('mousemove', onResizeMouseMove);
+        document.addEventListener('mouseup', onResizeMouseUp);
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      
+      const onResizeMouseMove = (e) => {
+        if (!isResizing) return;
+        const dx = e.clientX - resizeStartX;
+        const dy = e.clientY - resizeStartY;
+        const newWidth = Math.max(300, Math.min(resizeStartWidth + dx, window.innerWidth - 20));
+        const newHeight = Math.max(200, Math.min(resizeStartHeight + dy, window.innerHeight - 20));
+        this.previewPanel.style.width = `${newWidth}px`;
+        this.previewPanel.style.height = `${newHeight}px`;
+        this.previewSize.width = newWidth;
+        this.previewSize.height = newHeight;
+      };
+      
+      const onResizeMouseUp = () => {
+        isResizing = false;
+        document.removeEventListener('mousemove', onResizeMouseMove);
+        document.removeEventListener('mouseup', onResizeMouseUp);
+        this.saveListData();
+      };
+      
+      resizeHandle.addEventListener('mousedown', onResizeMouseDown);
+      
+      this.previewPanel.appendChild(header);
+      this.previewPanel.appendChild(contentDiv);
+      this.previewPanel.appendChild(resizeHandle);
+      this.previewPanel.style.display = 'flex';
+      console.timeEnd('buildDOM');
+      
+      console.time('renderMarkdown');
+      try {
+        await MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);
+        if (!contentDiv.innerHTML || contentDiv.innerHTML.trim() === '') {
+          contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+        }
+      } catch (renderError) {
+        console.error('MarkdownRenderer.render failed:', renderError);
+        contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+      }
+      console.timeEnd('renderMarkdown');
+      
+      console.time('positioning');
+      this.positionPreviewPanel();
+      this.highlightCurrentPreviewItem();
+      console.timeEnd('positioning');
+      
+      this.setupPreviewOutsideClick();
+      
+      setTimeout(() => {
+        console.time('scrollToHeading');
+        this.scrollToHeadingInPreview(contentDiv, heading);
+        console.timeEnd('scrollToHeading');
+      }, 100);
+      
+      console.timeEnd('showPreviewWithHeading');
+      
+    } catch (e) {
+      console.error('Failed to read file:', e);
+      this.closePreview();
+    }
+  }
+
+  scrollToHeadingInPreview(contentDiv, heading) {
+    if (!contentDiv) return;
+    
+    const headingText = heading.toLowerCase().trim();
+    const elements = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    
+    for (const el of elements) {
+      const elText = el.textContent.toLowerCase().trim();
+      const cleanElText = elText.replace(/<[^>]*>/g, '').trim();
+      if (cleanElText === headingText || cleanElText.includes(headingText)) {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
+        break;
+      }
+    }
+  }
+
+  jumpToHeadingInEditor(heading) {
+    if (this.isReadingMode()) {
+      const readingEl = this.getReadingViewContentEl();
+      if (!readingEl) return;
+      const headingText = heading.toLowerCase().trim();
+      const elements = readingEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      for (const el of elements) {
+        const elText = el.textContent.toLowerCase().trim();
+        if (elText === headingText || elText.includes(headingText)) {
+          el.scrollIntoView({ behavior: 'auto', block: 'start' });
+          break;
+        }
+      }
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+    
+    const cm = editor.cm;
+    const content = editor.getValue();
+    const lines = content.split('\n');
+    const headingLower = heading.toLowerCase().trim();
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        const lineHeadingText = headingMatch[2].replace(/\s+#[\w\u4e00-\u9fa5]+\s*$/g, '').replace(/<[^>]*>/g, '').trim().toLowerCase();
+        if (lineHeadingText === headingLower || lineHeadingText.includes(headingLower)) {
+          const lineNum = i + 1;
+          const lineObj = cm.state.doc.line(lineNum);
+          
+          cm.dispatch({
+            selection: { anchor: lineObj.from },
+            scrollIntoView: { range: { from: lineObj.from, to: lineObj.from } }
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  positionListNearFloatingToggle() {
+    if (!this.matchList || !this.floatingToggle) return;
+    
+    const toggleRect = this.floatingToggle.getBoundingClientRect();
+    const listWidth = this.matchListSize.width || this.settings.matchListWidth || 280;
+    const listHeight = this.matchList.offsetHeight || (this.matchListSize.height || this.settings.matchListHeight || 400);
+    
+    let left = toggleRect.left;
+    let top = toggleRect.bottom + 5;
+    
+    // If list would go off right edge, align to right
+    if (left + listWidth > window.innerWidth - 10) {
+      left = window.innerWidth - listWidth - 10;
+    }
+    // If list would go off left edge
+    if (left < 10) left = 10;
+    
+    if (top + listHeight > window.innerHeight - 10) {
+      const availableBelow = window.innerHeight - top - 10;
+      const availableAbove = toggleRect.top - 15;
+      if (availableBelow >= 60) {
+        this.matchList.style.maxHeight = `${availableBelow}px`;
+      } else if (availableAbove >= 60) {
+        top = toggleRect.top - Math.min(listHeight, availableAbove) - 5;
+        this.matchList.style.maxHeight = `${Math.min(listHeight, availableAbove)}px`;
+      } else {
+        this.matchList.style.maxHeight = `${Math.max(60, window.innerHeight - 20)}px`;
+        top = 10;
+      }
+    } else {
+      this.matchList.style.maxHeight = '';
+    }
+    
+    this.matchList.style.left = `${left}px`;
+    this.matchList.style.top = `${top}px`;
+  }
+
+  positionListNearIndicator() {
+    if (!this.matchList || !this.lastIndicatorCoords) {
+      this.positionListDefault();
+      return;
+    }
+    
+    const listWidth = this.matchListSize.width || this.settings.matchListWidth || 280;
+    const listHeight = this.matchListSize.height || this.settings.matchListHeight || 400;
+    
+    const targetRect = this.lastIndicatorCoords.targetRect;
+    const indicatorX = this.lastIndicatorCoords.screenX;
+    const indicatorY = this.lastIndicatorCoords.screenY;
+    
+    const selectionRight = targetRect ? targetRect.right + 20 : indicatorX;
+    const selectionLeft = targetRect ? targetRect.left - 20 : indicatorX;
+    const selectionTop = targetRect ? targetRect.top : indicatorY;
+    const selectionBottom = targetRect ? targetRect.bottom : indicatorY;
+    const selectionCenter = (selectionTop + selectionBottom) / 2;
+    
+    const availableWidthRight = window.innerWidth - selectionRight - 10;
+    const availableWidthLeft = selectionLeft - 10;
+    
+    let left, top;
+    
+    if (availableWidthRight >= listWidth) {
+      left = selectionRight;
+    } else if (availableWidthLeft >= listWidth) {
+      left = selectionLeft - listWidth;
+    } else if (availableWidthRight >= availableWidthLeft) {
+      left = window.innerWidth - listWidth - 10;
+    } else {
+      left = 10;
+    }
+
+    let idealTop = selectionCenter - listHeight / 2;
+    
+    if (idealTop < 10) {
+      idealTop = 10;
+    } else if (idealTop + listHeight > window.innerHeight - 10) {
+      idealTop = window.innerHeight - listHeight - 10;
+    }
+    
+    top = idealTop;
+
+    this.matchList.style.left = `${left}px`;
+    this.matchList.style.top = `${top}px`;
+  }
+
+  updateListPositionNearSelection() {
+    if (!this.matchList || this.matchList.style.display === 'none') return;
+    if (this.isPreviewOpen) return;
+    if (this.listFixedPosition.left !== null || this.listFixedPosition.top !== null) return;
+    
+    const listWidth = this.matchListSize.width || this.settings.matchListWidth || 280;
+    const listHeight = this.matchListSize.height || this.settings.matchListHeight || 400;
+    
+    let selectionRight, selectionLeft, selectionTop, selectionBottom;
+    
+    if (this.isReadingMode()) {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        this.positionListDefault();
+        return;
+      }
+      try {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (!rect || rect.width === 0) {
+          this.positionListDefault();
+          return;
+        }
+        selectionRight = rect.right + 20;
+        selectionLeft = rect.left - 20;
+        selectionTop = rect.top;
+        selectionBottom = rect.bottom;
+      } catch (e) {
+        this.positionListDefault();
+        return;
+      }
+    } else {
+      const editor = this.getEditor();
+      if (!editor || !editor.cm) {
+        this.positionListDefault();
+        return;
+      }
+
+      const cm = editor.cm;
+      const selection = editor.getSelection();
+      if (!selection) {
+        this.positionListDefault();
+        return;
+      }
+
+      try {
+        const from = editor.getCursor('from');
+        const to = editor.getCursor('to');
+        
+        const lineFrom = cm.state.doc.line(from.line + 1);
+        const lineTo = cm.state.doc.line(to.line + 1);
+        const posFrom = lineFrom.from + from.ch;
+        const posTo = lineTo.from + to.ch;
+        
+        const coordsFrom = cm.coordsAtPos(posFrom);
+        const coordsTo = cm.coordsAtPos(posTo);
+        
+        if (!coordsFrom || !coordsTo) {
+          this.positionListDefault();
+          return;
+        }
+        
+        selectionRight = Math.max(coordsFrom.left, coordsTo.left) + 20;
+        selectionLeft = Math.min(coordsFrom.left, coordsTo.left) - 20;
+        selectionTop = Math.min(coordsFrom.top, coordsTo.top);
+        selectionBottom = Math.max(coordsFrom.bottom, coordsTo.bottom);
+      } catch (e) {
+        this.positionListDefault();
+        return;
+      }
+    }
+    
+    const availableWidthRight = window.innerWidth - selectionRight - 10;
+    const availableWidthLeft = selectionLeft - 10;
+    
+    let left, top;
+    
+    if (availableWidthRight >= listWidth) {
+      left = selectionRight;
+    } else if (availableWidthLeft >= listWidth) {
+      left = selectionLeft - listWidth;
+    } else if (availableWidthRight >= availableWidthLeft) {
+      left = window.innerWidth - listWidth - 10;
+    } else {
+      left = 10;
+    }
+    
+    const selectionCenter = (selectionTop + selectionBottom) / 2;
+    let idealTop = selectionCenter - listHeight / 2;
+    
+    if (idealTop < 10) {
+      idealTop = 10;
+    } else if (idealTop + listHeight > window.innerHeight - 10) {
+      idealTop = window.innerHeight - listHeight - 10;
+    }
+    
+    top = idealTop;
+
+    this.matchList.style.left = `${left}px`;
+    this.matchList.style.top = `${top}px`;
+  }
+
+  positionListDefault() {
+    if (!this.matchList || !this.minimapContainer) return;
+    
+    const rect = this.minimapContainer.getBoundingClientRect();
+    const listWidth = this.matchListSize.width || this.settings.matchListWidth || 280;
+    const listHeight = this.matchListSize.height || this.settings.matchListHeight || 400;
+    
+    let left = rect.left - listWidth - 10;
+    let top = rect.top;
+    
+    if (left < 10) {
+      left = rect.right + 10;
+    }
+    
+    if (top + listHeight > window.innerHeight - 10) {
+      top = Math.max(10, window.innerHeight - listHeight - 10);
+    }
+    
+    this.matchList.style.left = `${left}px`;
+    this.matchList.style.top = `${top}px`;
+  }
+
+  async openFile(file) {
+    const leaf = this.app.workspace.getLeaf();
+    await leaf.openFile(file);
+  }
+
+  async openFileInNewTab(file, setActive = true) {
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.openFile(file, { setActive });
+  }
+
+  // 从文本中提取第一句话（支持中英文句号、感叹号、问号、换行）
+  getFirstSentence(text) {
+    if (!text) return '';
+    // Remove leading "..." if present (from snippet truncation)
+    let cleanText = text.replace(/^\.\.\.\s*/, '');
+    const match = cleanText.match(/[^。！？\.\?\!]*[。！？\.\?\!\n]/);
+    if (match) {
+      return match[0].trim();
+    }
+    // 如果没有找到句末标点，返回整段文本
+    return cleanText.trim();
+  }
+
+  // 清空跳转高亮
+  clearJumpHighlight(cm) {
+    if (!cm) return;
+    cm.dispatch({
+      effects: setJumpHighlight.of(Decoration.none)
+    });
+  }
+
+  // 编辑模式：用 border-pulse-red 临时高亮跳转文本
+  highlightJumpText(cm, from, to) {
+    if (!cm) return;
+    const deco = Decoration.mark({
+      class: 'border-pulse-red'
+    });
+    const decorationSet = Decoration.set([{ from, to, value: deco }]);
+    cm.dispatch({
+      effects: setJumpHighlight.of(decorationSet)
+    });
+    // 3秒后自动移除高亮
+    setTimeout(() => {
+      this.clearJumpHighlight(cm);
+    }, 3000);
+  }
+
+  // 阅读模式：用 span.border-pulse-red 包裹跳转文本
+  highlightJumpTextReading(container, textNode, offset, length) {
+    const parent = textNode.parentNode;
+    if (!parent || parent.closest('.border-pulse-red')) return;
+
+    const range = document.createRange();
+    range.setStart(textNode, offset);
+    range.setEnd(textNode, offset + length);
+
+    const span = document.createElement('span');
+    span.className = 'border-pulse-red';
+    range.surroundContents(span);
+
+    // 3秒后自动移除
+    setTimeout(() => {
+      const parentSpan = span.parentNode;
+      if (parentSpan) {
+        const text = span.textContent || '';
+        const textNode2 = document.createTextNode(text);
+        parentSpan.replaceChild(textNode2, span);
+      }
+    }, 3000);
+  }
+
+  jumpToSearchTextInEditor(searchText) {
+    if (this.isReadingMode()) {
+      const readingEl = this.getReadingViewContentEl();
+      if (!readingEl) return;
+      const searchLower = searchText.toLowerCase();
+      const walker = document.createTreeWalker(readingEl, NodeFilter.SHOW_TEXT, null, false);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const idx = node.textContent.toLowerCase().indexOf(searchLower);
+        if (idx !== -1) {
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + searchText.length);
+          range.scrollIntoView({ behavior: 'auto', block: 'center' });
+
+          // 临时高亮 border-pulse-red
+          this.highlightJumpTextReading(readingEl, node, idx, searchText.length);
+          break;
+        }
+      }
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+
+    const cm = editor.cm;
+    const content = editor.getValue();
+    const searchLower = searchText.toLowerCase();
+    const lines = content.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const pos = lines[i].toLowerCase().indexOf(searchLower);
+      if (pos !== -1) {
+        const lineNum = i + 1;
+        const lineObj = cm.state.doc.line(lineNum);
+        const from = lineObj.from + pos;
+        const to = from + lines[i].slice(pos, pos + searchText.length).length;
+
+        cm.dispatch({
+          selection: { anchor: from, head: to },
+          scrollIntoView: { range: { from, to } }
+        });
+
+        // 临时高亮 border-pulse-red
+        this.highlightJumpText(cm, from, to);
+        break;
+      }
+    }
+  }
+
+  jumpToTagInEditor(tag) {
+    if (this.isReadingMode()) {
+      const readingEl = this.getReadingViewContentEl();
+      if (!readingEl) return;
+      const tagSelector = `a.tag[href*="${tag}"], .tag[href*="${tag}"]`;
+      const tagEl = readingEl.querySelector(tagSelector);
+      if (tagEl) {
+        tagEl.scrollIntoView({ behavior: 'auto', block: 'center' });
+      } else {
+        // Fallback: search text nodes for the tag
+        const searchLower = `#${tag.toLowerCase()}`;
+        const walker = document.createTreeWalker(readingEl, NodeFilter.SHOW_TEXT, null, false);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          const idx = node.textContent.toLowerCase().indexOf(searchLower);
+          if (idx !== -1) {
+            const range = document.createRange();
+            range.setStart(node, idx);
+            range.setEnd(node, idx + searchLower.length);
+            range.scrollIntoView({ behavior: 'auto', block: 'center' });
+            break;
+          }
+        }
+      }
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+
+    const cm = editor.cm;
+    const content = editor.getValue();
+    const lines = content.split('\n');
+    const tagPattern = new RegExp(`#${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s,.;:!?'")\\]}>]|$)`, 'i');
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = tagPattern.exec(lines[i]);
+      if (match) {
+        const lineNum = i + 1;
+        const lineObj = cm.state.doc.line(lineNum);
+        const from = lineObj.from + match.index;
+
+        cm.dispatch({
+          selection: { anchor: from },
+          scrollIntoView: { range: { from, to: from } }
+        });
+        break;
+      }
+    }
+  }
+
+  async showPreview(file) {
+    if (!this.previewPanel) return;
+
+    console.time('showPreview');
+    this.cancelSearch();
+    console.timeLog('showPreview', 'cancelSearch done');
+
+    this.isPreviewOpen = true;
+    this.currentPreviewFile = file;
+    
+    if (this.previewListPosition.left !== null && this.previewListPosition.top !== null) {
+      this.listFixedPosition.left = this.previewListPosition.left;
+      this.listFixedPosition.top = this.previewListPosition.top;
+      this.matchList.style.left = `${this.previewListPosition.left}px`;
+      this.matchList.style.top = `${this.previewListPosition.top}px`;
+    }
+    
+    if (this._matchListPositionUpdater) {
+      window.removeEventListener('resize', this._matchListPositionUpdater);
+      this._matchListPositionUpdater = null;
+    }
+    
+    try {
+      console.time('readFile');
+      const content = await this.app.vault.read(file);
+      console.timeEnd('readFile');
+      
+      console.time('buildDOM');
+      this.previewPanel.innerHTML = '';
+      
+      const header = document.createElement('div');
+      header.className = 'minimap-preview-header';
+      header.innerHTML = `
+        <span class="minimap-preview-title">${file.basename}</span>
+      `;
+      header.style.cursor = 'move';
+      header.style.userSelect = 'none';
+      
+      let isDraggingPanel = false;
+      let panelDragStartX, panelDragStartY, panelDragStartLeft, panelDragStartTop;
+      
+      const onPanelDragMouseDown = (e) => {
+        if (e.target.closest('.minimap-preview-resize-handle')) return;
+        isDraggingPanel = true;
+        panelDragStartX = e.clientX;
+        panelDragStartY = e.clientY;
+        const panelRect = this.previewPanel.getBoundingClientRect();
+        panelDragStartLeft = panelRect.left;
+        panelDragStartTop = panelRect.top;
+        document.addEventListener('mousemove', onPanelDragMouseMove);
+        document.addEventListener('mouseup', onPanelDragMouseUp);
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      
+      const onPanelDragMouseMove = (e) => {
+        if (!isDraggingPanel) return;
+        const dx = e.clientX - panelDragStartX;
+        const dy = e.clientY - panelDragStartY;
+        let newLeft = panelDragStartLeft + dx;
+        let newTop = panelDragStartTop + dy;
+        newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - 100));
+        newTop = Math.max(0, Math.min(newTop, window.innerHeight - 50));
+        this.previewPanel.style.left = `${newLeft}px`;
+        this.previewPanel.style.top = `${newTop}px`;
+      };
+      
+      const onPanelDragMouseUp = () => {
+        isDraggingPanel = false;
+        document.removeEventListener('mousemove', onPanelDragMouseMove);
+        document.removeEventListener('mouseup', onPanelDragMouseUp);
+      };
+      
+      header.addEventListener('mousedown', onPanelDragMouseDown);
+      
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'minimap-preview-content markdown-preview-view';
+      
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'minimap-preview-resize-handle';
+      resizeHandle.style.cssText = `
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 15px;
+        height: 15px;
+        cursor: nwse-resize;
+        z-index: 10;
+        background: linear-gradient(135deg, transparent 50%, var(--text-muted) 50%);
+      `;
+      
+      let isResizing = false;
+      let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
+      
+      const onResizeMouseDown = (e) => {
+        isResizing = true;
+        resizeStartX = e.clientX;
+        resizeStartY = e.clientY;
+        resizeStartWidth = this.previewPanel.offsetWidth;
+        resizeStartHeight = this.previewPanel.offsetHeight;
+        document.addEventListener('mousemove', onResizeMouseMove);
+        document.addEventListener('mouseup', onResizeMouseUp);
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      
+      const onResizeMouseMove = (e) => {
+        if (!isResizing) return;
+        const dx = e.clientX - resizeStartX;
+        const dy = e.clientY - resizeStartY;
+        const newWidth = Math.max(300, Math.min(resizeStartWidth + dx, window.innerWidth - 20));
+        const newHeight = Math.max(200, Math.min(resizeStartHeight + dy, window.innerHeight - 20));
+        this.previewPanel.style.width = `${newWidth}px`;
+        this.previewPanel.style.height = `${newHeight}px`;
+        this.previewSize.width = newWidth;
+        this.previewSize.height = newHeight;
+      };
+      
+      const onResizeMouseUp = () => {
+        isResizing = false;
+        document.removeEventListener('mousemove', onResizeMouseMove);
+        document.removeEventListener('mouseup', onResizeMouseUp);
+        this.saveListData();
+      };
+      
+      resizeHandle.addEventListener('mousedown', onResizeMouseDown);
+      
+      this.previewPanel.appendChild(header);
+      this.previewPanel.appendChild(contentDiv);
+      this.previewPanel.appendChild(resizeHandle);
+      this.previewPanel.style.display = 'flex';
+      console.timeEnd('buildDOM');
+      
+      console.time('renderMarkdown');
+      try {
+        await MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);
+        if (!contentDiv.innerHTML || contentDiv.innerHTML.trim() === '') {
+          contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+        }
+      } catch (renderError) {
+        console.error('MarkdownRenderer.render failed:', renderError);
+        contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+      }
+      console.timeEnd('renderMarkdown');
+      
+      console.time('positioning');
+      this.positionPreviewPanel();
+      this.highlightCurrentPreviewItem();
+      console.timeEnd('positioning');
+      
+      this.setupPreviewOutsideClick();
+      
+      console.timeEnd('showPreview');
+      
+    } catch (e) {
+      console.error('Failed to read file:', e);
+      this.closePreview();
+    }
+  }
+
+  setupPreviewOutsideClick() {
+    if (this._previewOutsideClickHandler) {
+      document.removeEventListener('mousedown', this._previewOutsideClickHandler);
+    }
+    
+    this._previewOutsideClickHandler = (e) => {
+      if (!this.previewPanel || this.previewPanel.style.display === 'none') return;
+      
+      const isInPreview = this.previewPanel.contains(e.target);
+      const isInList = this.matchList && this.matchList.contains(e.target);
+      
+      if (!isInPreview && !isInList) {
+        this.closePreview();
+        e.stopPropagation();
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._previewOutsideClickHandler);
+    }, 10);
+  }
+
+  highlightCurrentPreviewItem() {
+    if (!this.matchList || !this.currentPreviewFile) return;
+    
+    const groupItems = this.matchList.querySelectorAll('.swift-match-group');
+    groupItems.forEach(item => {
+      if (item.dataset.filePath === this.currentPreviewFile.path) {
+        item.classList.add('previewing');
+      } else {
+        item.classList.remove('previewing');
+      }
+    });
+  }
+
+  async exportMatchList(fileMap, searchText, matchCount) {
+    if (!fileMap || fileMap.size === 0) return;
+    
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const fileName = `SwiftMatch_${searchText}_${dateStr}.md`;
+    
+    const totalMatchCount = this._pendingMatchCount || matchCount;
+    
+    let md = `# SwiftMatch 搜索结果\n\n`;
+    md += `- **搜索词**: \`${searchText}\`\n`;
+    md += `- **匹配文档数**: ${fileMap.size}\n`;
+    md += `- **总匹配数**: ${totalMatchCount} 项结果\n`;
+    md += `- **导出时间**: ${now.toLocaleString()}\n\n`;
+    md += `---\n\n`;
+    
+    fileMap.forEach((items, file) => {
+      md += `## [[${file.basename}]]\n\n`;
+      items.forEach(item => {
+        if (item.type === 'tag') {
+          md += `- #${item.text}\n`;
+        } else if (item.type === 'heading') {
+          md += `- **[[${file.basename}#${item.text}]]**\n`;
+        } else if (item.type === 'content') {
+          if (item.snippets && item.snippets.length > 0) {
+            for (const s of item.snippets) {
+              md += `  > ${s.replace(/\n/g, ' ')}\n`;
+            }
+          } else if (item.snippet) {
+            md += `  > ${item.snippet.replace(/\n/g, ' ')}\n`;
+          } else {
+            md += `- ${item.text}\n`;
+          }
+        } else {
+          md += `- ${item.text}\n`;
+        }
+      });
+      md += `\n`;
+    });
+    
+    try {
+      const adapter = this.app.vault.adapter;
+      await adapter.write(fileName, md);
+      
+      // Open the file in a new tab
+      const file = this.app.vault.getAbstractFileByPath(fileName);
+      if (file) {
+        await this.app.workspace.getLeaf('tab').openFile(file);
+      }
+      new Notice(t('exported', fileName));
+    } catch (e) {
+      console.error('Failed to export match list:', e);
+      new Notice(t('exportFailed', e.message));
+    }
+  }
+
+  _setupSwiftMatchExportNav() {
+    // Remove existing popup and listeners
+    this._removeSwiftMatchExportNav();
+    const file = this.app.workspace.activeLeaf?.view?.file;
+    if (!file || !file.basename.startsWith('SwiftMatch_')) return;
+
+    // Listen for text selection in this document
+    this._swiftMatchMouseUpHandler = () => {
+      setTimeout(() => this._handleSwiftMatchSelection(), 200);
+    };
+    this._swiftMatchMouseDownHandler = () => {
+      this._hideSwiftMatchNavPopup();
+    };
+    document.addEventListener('mouseup', this._swiftMatchMouseUpHandler);
+    document.addEventListener('mousedown', this._swiftMatchMouseDownHandler, true);
+  }
+
+  _removeSwiftMatchExportNav() {
+    if (this._swiftMatchMouseUpHandler) {
+      document.removeEventListener('mouseup', this._swiftMatchMouseUpHandler);
+      this._swiftMatchMouseUpHandler = null;
+    }
+    if (this._swiftMatchMouseDownHandler) {
+      document.removeEventListener('mousedown', this._swiftMatchMouseDownHandler, true);
+      this._swiftMatchMouseDownHandler = null;
+    }
+    this._hideSwiftMatchNavPopup();
+  }
+
+  _handleSwiftMatchSelection() {
+    const file = this.app.workspace.activeLeaf?.view?.file;
+    if (!file || !file.basename.startsWith('SwiftMatch_')) {
+      this._removeSwiftMatchExportNav();
+      return;
+    }
+
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.toString().trim().length === 0) {
+      this._hideSwiftMatchNavPopup();
+      return;
+    }
+
+    // Find the nearest heading/wiki-link above the selection
+    const range = sel.getRangeAt(0);
+    let node = range.startContainer;
+
+    // Walk up to find the content block element
+    let container = node instanceof Element ? node : node.parentElement;
+    const contentEl = container?.closest('.markdown-reading-view, .markdown-preview-view, .markdown-source-view');
+    if (!contentEl) return;
+
+    // Find the closest heading or section with a wiki-link
+    let sourceInfo = this._findSourceInfoForSelection(container, contentEl);
+
+    if (!sourceInfo) {
+      this._hideSwiftMatchNavPopup();
+      return;
+    }
+
+    // Show the navigation popup
+    const rect = range.getBoundingClientRect();
+    this._showSwiftMatchNavPopup(rect, sourceInfo, sel.toString().trim());
+  }
+
+  _findSourceInfoForSelection(element, contentEl) {
+    // Walk up from the selection element to find the nearest heading/section with a wiki-link
+    let current = element;
+    let foundHeading = null;
+    let foundFile = null;
+
+    while (current && current !== contentEl) {
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        // Check if this is a heading with a link
+        if (current.tagName && current.tagName.match(/^H[1-6]$/)) {
+          const link = current.querySelector('a.internal-link, .internal-link');
+          if (link) {
+            const href = link.getAttribute('data-href') || link.getAttribute('href') || link.textContent;
+            if (href) {
+              const parts = href.split('#');
+              foundFile = parts[0];
+              foundHeading = parts.length > 1 ? parts.slice(1).join('#') : null;
+              return { fileName: foundFile, heading: foundHeading };
+            }
+          }
+          // Also check for plain text wiki-link format in the heading
+          const headingText = current.textContent;
+          const wikiMatch = headingText.match(/\[\[([^\]]+)\]\]/);
+          if (wikiMatch) {
+            const parts = wikiMatch[1].split('#');
+            foundFile = parts[0];
+            foundHeading = parts.length > 1 ? parts.slice(1).join('#') : null;
+            return { fileName: foundFile, heading: foundHeading };
+          }
+        }
+
+        // Check if this element contains an internal link
+        const links = current.querySelectorAll(':scope > a.internal-link, :scope > .internal-link');
+        for (const link of links) {
+          const href = link.getAttribute('data-href') || link.getAttribute('href') || link.textContent;
+          if (href) {
+            const parts = href.split('#');
+            foundFile = parts[0];
+            foundHeading = parts.length > 1 ? parts.slice(1).join('#') : null;
+            return { fileName: foundFile, heading: foundHeading };
+          }
+        }
+      }
+      current = current.parentElement;
+    }
+
+    // Fallback: scan all headings in the document for the section containing the selection
+    const allHeadings = contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const selRange = window.getSelection().getRangeAt(0);
+    const selTop = selRange.getBoundingClientRect().top;
+
+    let closestHeading = null;
+    let closestTop = -Infinity;
+
+    for (const h of allHeadings) {
+      const hRect = h.getBoundingClientRect();
+      if (hRect.top <= selTop && hRect.top > closestTop) {
+        closestTop = hRect.top;
+        closestHeading = h;
+      }
+    }
+
+    if (closestHeading) {
+      // Look for wiki-link in heading text (format: ## [[filename]] or ## [[filename#heading]])
+      const headingText = closestHeading.textContent;
+      const wikiMatch = headingText.match(/\[\[([^\]]+)\]\]/);
+      if (wikiMatch) {
+        const parts = wikiMatch[1].split('#');
+        return { fileName: parts[0], heading: parts.length > 1 ? parts.slice(1).join('#') : null };
+      }
+
+      // Also check for rendered internal links
+      const link = closestHeading.querySelector('a.internal-link, .internal-link');
+      if (link) {
+        const href = link.getAttribute('data-href') || link.getAttribute('href') || link.textContent;
+        if (href) {
+          const parts = href.split('#');
+          return { fileName: parts[0], heading: parts.length > 1 ? parts.slice(1).join('#') : null };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  _showSwiftMatchNavPopup(rect, sourceInfo, selectedText) {
+    this._hideSwiftMatchNavPopup();
+
+    const popup = document.createElement('div');
+    popup.className = 'swift-match-nav-popup';
+    popup.style.cssText = `
+      position: fixed;
+      z-index: 999999;
+      background: var(--background-primary);
+      border: 1px solid var(--interactive-accent);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-normal);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      white-space: nowrap;
+      transition: background 0.15s, transform 0.15s;
+      top: ${rect.top - 32}px;
+      left: ${rect.left + rect.width / 2 - 60}px;
+    `;
+
+    const displayText = sourceInfo.heading 
+      ? `→ ${sourceInfo.fileName}#${sourceInfo.heading}` 
+      : `→ ${sourceInfo.fileName}`;
+    popup.textContent = displayText;
+
+    popup.addEventListener('mouseenter', () => {
+      popup.style.background = 'var(--background-modifier-hover)';
+      popup.style.transform = 'scale(1.05)';
+    });
+    popup.addEventListener('mouseleave', () => {
+      popup.style.background = 'var(--background-primary)';
+      popup.style.transform = 'scale(1)';
+    });
+    popup.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    popup.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this._navigateToSwiftMatchSource(sourceInfo, selectedText);
+      this._hideSwiftMatchNavPopup();
+    });
+
+    document.body.appendChild(popup);
+    this._swiftMatchNavPopup = popup;
+
+    // Auto-hide after 5 seconds
+    this._swiftMatchNavTimer = setTimeout(() => {
+      this._hideSwiftMatchNavPopup();
+    }, 5000);
+  }
+
+  _hideSwiftMatchNavPopup() {
+    if (this._swiftMatchNavTimer) {
+      clearTimeout(this._swiftMatchNavTimer);
+      this._swiftMatchNavTimer = null;
+    }
+    if (this._swiftMatchNavPopup) {
+      this._swiftMatchNavPopup.remove();
+      this._swiftMatchNavPopup = null;
+    }
+  }
+
+  async _navigateToSwiftMatchSource(sourceInfo, selectedText) {
+    // Find the file by name
+    const allFiles = this.app.vault.getMarkdownFiles();
+    let targetFile = null;
+    for (const f of allFiles) {
+      if (f.basename === sourceInfo.fileName) {
+        targetFile = f;
+        break;
+      }
+    }
+    if (!targetFile) {
+      new Notice(t('sourceNotFound', sourceInfo.fileName));
+      return;
+    }
+
+    // Open in new tab
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.openFile(targetFile);
+
+    // Wait for the file to load, then navigate to the heading or search for the selected text
+    setTimeout(() => {
+      if (sourceInfo.heading) {
+        // Navigate to heading
+        this._jumpToHeadingInActiveDoc(sourceInfo.heading);
+      }
+      // Also try to find and select the specific text
+      if (selectedText) {
+        this._findAndSelectTextInActiveDoc(selectedText);
+      }
+    }, 500);
+  }
+
+  _jumpToHeadingInActiveDoc(headingText) {
+    // Try to find the heading in the current view
+    const view = this.app.workspace.activeLeaf?.view;
+    if (!view) return;
+
+    // For reading mode
+    const readingView = view.containerEl?.querySelector('.markdown-reading-view, .markdown-preview-view');
+    if (readingView) {
+      const headings = readingView.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      for (const h of headings) {
+        const text = h.textContent.replace(/\[\[|\]\]/g, '').trim();
+        if (text.includes(headingText) || headingText.includes(text)) {
+          h.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight briefly
+          h.style.backgroundColor = 'rgba(255, 200, 0, 0.3)';
+          setTimeout(() => { h.style.backgroundColor = ''; }, 2000);
+          return;
+        }
+      }
+    }
+
+    // For source mode, use editor search
+    const editor = this.getEditor();
+    if (editor) {
+      const content = editor.getValue();
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const headingMatch = lines[i].match(/^#{1,6}\s+(.+?)(?:\s+#[\w\u4e00-\u9fa5\-\/]+)*\s*$/);
+        if (headingMatch) {
+          const hText = headingMatch[1].replace(/\s+#[\w\u4e00-\u9fa5\-\/]+\s*$/g, '').trim();
+          if (hText.includes(headingText) || headingText.includes(hText)) {
+            editor.setCursor({ line: i, ch: 0 });
+            editor.scrollIntoView({ from: { line: i, ch: 0 }, to: { line: i, ch: 0 } }, true);
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  _findAndSelectTextInActiveDoc(text) {
+    const editor = this.getEditor();
+    if (!editor) return;
+
+    const content = editor.getValue();
+    const searchLower = text.toLowerCase();
+    const contentLower = content.toLowerCase();
+    const pos = contentLower.indexOf(searchLower);
+    if (pos >= 0) {
+      // Convert character offset to line/ch
+      const beforeText = content.substring(0, pos);
+      const line = beforeText.split('\n').length - 1;
+      const ch = pos - beforeText.lastIndexOf('\n') - 1;
+      const endLine = line + text.split('\n').length - 1;
+      const lastNewline = text.lastIndexOf('\n');
+      const endCh = lastNewline >= 0 ? text.length - lastNewline - 1 : ch + text.length;
+
+      editor.setSelection({ line, ch: Math.max(0, ch) }, { line: endLine, ch: endCh });
+      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line: endLine, ch: 0 } }, true);
+    }
+  }
+
+  closePreview() {
+    if (this._previewOutsideClickHandler) {
+      document.removeEventListener('mousedown', this._previewOutsideClickHandler);
+      this._previewOutsideClickHandler = null;
+    }
+    
+    if (this.previewPanel) {
+      this.previewPanel.style.display = 'none';
+      this.previewPanel.innerHTML = '';
+    }
+    this.isPreviewOpen = false;
+    this.currentPreviewFile = null;
+    this.currentPreviewHeading = null;
+    this.restoreListPosition();
+    
+    this._pendingListClose = true;
+    
+    this._listCloseHandler = (e) => {
+      if (this._pendingListClose && this.matchList && this.matchList.style.display !== 'none') {
+        const clickedModal = e.target.closest('.modal-container, .modal-bg, .modal, [role="dialog"]');
+        const clickedKeywordBtn = e.target.closest('.swift-match-keyword-btn-wrapper');
+        if ((!this.matchList.contains(e.target) && !clickedKeywordBtn) || clickedModal) {
+          this.hideMatchList();
+          this._pendingListClose = false;
+          document.removeEventListener('mousedown', this._listCloseHandler);
+        }
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._listCloseHandler);
+    }, 10);
+  }
+
+  restoreListPosition() {
+    if (this.matchList) {
+      const savedWidth = this.matchListSize.width || this.settings.matchListWidth;
+      const savedHeight = this.matchListSize.height || this.settings.matchListHeight;
+      this.matchList.style.width = `${savedWidth}px`;
+      this.matchList.style.maxWidth = `${savedWidth}px`;
+      this.matchList.style.height = `${savedHeight}px`;
+    }
+  }
+
+  positionPreviewPanel() {
+    if (!this.previewPanel || !this.matchList) return;
+    
+    let panelWidth = Math.min(this.previewSize.width, window.innerWidth - 100);
+    let panelHeight = Math.min(this.previewSize.height, window.innerHeight - 100);
+    
+    panelWidth = Math.max(300, panelWidth);
+    panelHeight = Math.max(200, panelHeight);
+    
+    this.previewPanel.style.width = `${panelWidth}px`;
+    this.previewPanel.style.height = `${panelHeight}px`;
+    
+    const listWidth = this.matchList.offsetWidth || 250;
+    
+    let listLeft, listTop, panelLeft, panelTop;
+    
+    if (this.listFixedPosition.left !== null && this.listFixedPosition.top !== null) {
+      listLeft = this.listFixedPosition.left;
+      listTop = this.listFixedPosition.top;
+      
+      listLeft = Math.max(0, Math.min(listLeft, window.innerWidth - listWidth));
+      listTop = Math.max(0, Math.min(listTop, window.innerHeight - 100));
+      
+      panelLeft = listLeft + listWidth + 10;
+      panelTop = listTop;
+      
+      if (panelLeft + panelWidth > window.innerWidth - 10) {
+        panelLeft = Math.max(10, window.innerWidth - panelWidth - 10);
+        listLeft = panelLeft - listWidth - 10;
+        if (listLeft < 10) {
+          listLeft = 10;
+          panelWidth = Math.min(panelWidth, window.innerWidth - listWidth - 30);
+          this.previewPanel.style.width = `${panelWidth}px`;
+          panelLeft = listLeft + listWidth + 10;
+        }
+      }
+    } else {
+      panelLeft = window.innerWidth - panelWidth - 20;
+      panelTop = 50;
+      
+      if (panelLeft < listWidth + 30) {
+        panelLeft = listWidth + 30;
+        panelWidth = Math.min(panelWidth, window.innerWidth - listWidth - 50);
+        this.previewPanel.style.width = `${panelWidth}px`;
+      }
+      
+      if (panelTop + panelHeight > window.innerHeight - 10) {
+        panelTop = Math.max(10, window.innerHeight - panelHeight - 10);
+      }
+      
+      listLeft = panelLeft - listWidth - 10;
+      listTop = panelTop;
+      
+      if (listLeft < 10) {
+        listLeft = 10;
+        panelLeft = listLeft + listWidth + 10;
+      }
+    }
+    
+    this.matchList.style.left = `${listLeft}px`;
+    this.matchList.style.top = `${listTop}px`;
+    
+    this.listFixedPosition.left = listLeft;
+    this.listFixedPosition.top = listTop;
+    this.previewListPosition.left = listLeft;
+    this.previewListPosition.top = listTop;
+    
+    this.previewPanel.style.left = `${panelLeft}px`;
+    this.previewPanel.style.top = `${panelTop}px`;
+    
+    this.previewPanel.style.opacity = this.previewOpacity;
+  }
+
+  hideMatchList() {
+    if (this.matchList) {
+      const listContainer = this.matchList.querySelector('.minimap-match-list-container');
+      if (listContainer) {
+        const currentTerm = this._pendingShowList?.searchText || this._pendingSearchText;
+        if (currentTerm) {
+          this._listScrollPositions[currentTerm] = listContainer.scrollTop;
+        }
+        this._matchListScrollTop = listContainer.scrollTop;
+        this.saveListData();
+      }
+      this.matchList.style.display = 'none';
+    }
+    if (this._matchListPositionUpdater) {
+      window.removeEventListener('resize', this._matchListPositionUpdater);
+      this._matchListPositionUpdater = null;
+    }
+    if (this._listCloseHandler) {
+      document.removeEventListener('mousedown', this._listCloseHandler);
+      this._listCloseHandler = null;
+    }
+    this._pendingListClose = false;
+    this._isListVisible = false;
+    this._listUserDismissed = true;
+    this._searchCancelled = true;
+    this._pendingShowList = null;
+    this._listShownFromHover = false;
+    this._listTriggerElement = null;
+    // Don't clear _listPinnedSearchText - pin persists even when list is hidden
+    this.listFixedPosition.left = null;
+    this.listFixedPosition.top = null;
+  }
+
+  addEditorDecorations(cm, matchLines, totalMatches) {
+    if (!cm || !cm.scrollDOM) return;
+
+    const scheme = this.getCurrentSelectionColorScheme();
+    const borderColor = scheme.borderColor;
+    const borderWidth = this.settings.matchBorderWidth;
+    const counterOpacity = this.settings.counterOpacity;
+    const counterBgOpacity = this.settings.counterBgOpacity;
+    const counterColor = scheme.counterColor;
+    const counterBgColor = scheme.counterBgColor;
+    const counterSize = this.settings.counterSize;
+    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterTopOffset = `${this.settings.counterTopOffset}px`;
+
+    cm.scrollDOM.style.setProperty('--minimap-match-color', borderColor);
+    cm.scrollDOM.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
+    cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
+    cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    cm.scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
+    cm.scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
+    cm.scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
+
+    const decorations = [];
+    for (let idx = 0; idx < matchLines.length; idx++) {
+      const match = matchLines[idx];
+      const line = cm.state.doc.line(match.line + 1);
+      const from = line.from + match.pos;
+      const to = from + this.currentSelection.length;
+      const label = `${match.index}/${totalMatches}`;
+      const currentItem = this.savedMatchLists.find(m => m.selection === this.currentSelection);
+      const hideCounter = currentItem && currentItem.countHidden;
+
+      decorations.push({
+        from: from,
+        to: to,
+        value: Decoration.mark({
+          class: `minimap-editor-match${hideCounter ? ' minimap-hide-counter' : ''}`,
+          attributes: {
+            'data-match': label,
+            'style': `border-bottom: ${borderWidth}px solid ${borderColor}; padding-bottom: 1px;`
+          }
+        })
+      });
+    }
+
+    const decorationSet = Decoration.set(decorations.sort((a, b) => a.from - b.from));
+    cm.dispatch({
+      effects: setMatchHighlights.of(decorationSet)
+    });
+  }
+
+  addEditorDecorationsWithPinned(cm, matchLines, totalMatches) {
+    if (!cm || !cm.scrollDOM) return;
+
+    const borderWidth = this.settings.matchBorderWidth;
+    const counterOpacity = this.settings.counterOpacity;
+    const counterBgOpacity = this.settings.counterBgOpacity;
+    const counterColor = this.settings.counterColor;
+    const counterBgColor = this.settings.counterBgColor;
+    const counterSize = this.settings.counterSize;
+    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterTopOffset = `${this.settings.counterTopOffset}px`;
+
+    cm.scrollDOM.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
+    cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
+    cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    cm.scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
+    cm.scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
+    cm.scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
+
+    this.registerEditorField();
+
+    const content = cm.state.doc.toString();
+    const lines = content.split('\n');
+    const allDecorations = [];
+
+    const currentFile = this.app.workspace.activeLeaf?.view?.file;
+    const currentFilePath = currentFile ? currentFile.path : null;
+
+    // Add pinned decorations first
+    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || item.filePath === currentFilePath));
+    for (const pinnedItem of pinnedItems) {
+      const colorScheme = this.getPinnedColorScheme(pinnedItem);
+      const pBorderColor = colorScheme.borderColor;
+      const pCounterBgColor = colorScheme.counterBgColor;
+      const pCounterColor = colorScheme.counterColor;
+      const searchLower = pinnedItem.selection.toLowerCase();
+
+      // First pass: count total matches
+      let totalPinnedMatches = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase();
+        let pos = 0;
+        while ((pos = lineLower.indexOf(searchLower, pos)) !== -1) {
+          totalPinnedMatches++;
+          pos += 1;
+        }
+      }
+
+      // Second pass: create decorations
+      let matchIndex = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase();
+        let pos = 0;
+        while ((pos = lineLower.indexOf(searchLower, pos)) !== -1) {
+          matchIndex++;
+          try {
+            const line = cm.state.doc.line(i + 1);
+            const from = line.from + pos;
+            const to = from + pinnedItem.selection.length;
+            allDecorations.push({
+              from: from,
+              to: to,
+              value: Decoration.mark({
+                class: `minimap-editor-match pinned${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
+                attributes: {
+                  'data-selection': pinnedItem.selection,
+                  'data-match': `${matchIndex}/${totalPinnedMatches}`,
+                  'style': `border-bottom: ${borderWidth}px solid ${pBorderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${pCounterBgColor}; --minimap-counter-color: ${pCounterColor};`
+                }
+              })
+            });
+          } catch (e) {}
+          pos += 1;
+        }
+      }
+    }
+
+    // Add current selection decorations on top (using color scheme)
+    const currentColorScheme = this.getCurrentSelectionColorScheme();
+    const currentBorderColor = currentColorScheme.borderColor;
+    const currentCounterBgColor = currentColorScheme.counterBgColor;
+    const currentCounterColor = currentColorScheme.counterColor;
+
+    for (let idx = 0; idx < matchLines.length; idx++) {
+      const match = matchLines[idx];
+      try {
+        const line = cm.state.doc.line(match.line + 1);
+        const from = line.from + match.pos;
+        const to = from + this.currentSelection.length;
+        const label = `${match.index}/${totalMatches}`;
+
+        allDecorations.push({
+          from: from,
+          to: to,
+          value: Decoration.mark({
+            class: 'minimap-editor-match',
+            attributes: {
+              'data-match': label,
+              'style': `border-bottom: ${borderWidth}px solid ${currentBorderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${currentCounterBgColor}; --minimap-counter-color: ${currentCounterColor};`
+            }
+          })
+        });
+      } catch (e) {}
+    }
+
+    if (allDecorations.length > 0) {
+      const decorationSet = Decoration.set(allDecorations.sort((a, b) => a.from - b.from));
+      cm.dispatch({
+        effects: setMatchHighlights.of(decorationSet)
+      });
+    }
+  }
+
+  clearHighlights() {
+    this.highlights.forEach((h) => {
+      if (h.parentNode) h.parentNode.removeChild(h);
+    });
+    this.highlights = [];
+    this.editorHighlights = [];
+
+    if (this.isReadingMode()) {
+      this.clearReadingViewHighlights();
+    } else {
+      const editor = this.getEditor();
+      if (editor && editor.cm) {
+        editor.cm.dispatch({
+          effects: setMatchHighlights.of(Decoration.none)
+        });
+      }
+    }
+
+    // Pin only locks the word, not the list visibility - list can still be hidden
+    // But if _keepListVisible flag is set (e.g. from recent search chip click), don't hide
+    if (!this._keepListVisible) {
+      this.hideMatchList();
+    }
+    this._pendingMatchCount = 0;
+    this._pendingSearchText = null;
+    this.updateFloatingToggleBadge(0, 0);
+  }
+
+  showPinnedDecorations() {
+    const currentFile = this.app.workspace.activeLeaf?.view?.file;
+    const currentFilePath = currentFile ? currentFile.path : null;
+    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || item.filePath === currentFilePath));
+    if (pinnedItems.length === 0) return;
+
+    if (this.isReadingMode()) {
+      for (const pinnedItem of pinnedItems) {
+        const colorScheme = this.getPinnedColorScheme(pinnedItem);
+        this.addReadingViewHighlights(pinnedItem.selection, pinnedItem.matchCount || 0, colorScheme);
+      }
+      return;
+    }
+
+    const editor = this.getEditor();
+    if (!editor || !editor.cm) return;
+
+    const cm = editor.cm;
+    const content = editor.getValue();
+    const lines = content.split('\n');
+
+    this.registerEditorField();
+
+    const borderWidth = this.settings.matchBorderWidth;
+
+    const decorations = [];
+
+    for (const pinnedItem of pinnedItems) {
+      const colorScheme = this.getPinnedColorScheme(pinnedItem);
+      const borderColor = colorScheme.borderColor;
+      const counterBgColor = colorScheme.counterBgColor;
+      const counterColor = colorScheme.counterColor;
+
+      const searchLower = pinnedItem.selection.toLowerCase();
+
+      // First pass: count total matches
+      let totalPinnedMatches = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase();
+        let pos = 0;
+        while ((pos = lineLower.indexOf(searchLower, pos)) !== -1) {
+          totalPinnedMatches++;
+          pos += 1;
+        }
+      }
+
+      // Second pass: create decorations
+      let matchIndex = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase();
+        let pos = 0;
+        while ((pos = lineLower.indexOf(searchLower, pos)) !== -1) {
+          matchIndex++;
+          try {
+            const line = cm.state.doc.line(i + 1);
+            const from = line.from + pos;
+            const to = from + pinnedItem.selection.length;
+
+            decorations.push({
+              from: from,
+              to: to,
+              value: Decoration.mark({
+                class: `minimap-editor-match pinned${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
+                attributes: {
+                  'data-selection': pinnedItem.selection,
+                  'data-match': `${matchIndex}/${totalPinnedMatches}`,
+                  'style': `border-bottom: ${borderWidth}px solid ${borderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${this.hexToRgba(counterBgColor, this.settings.counterBgOpacity)}; --minimap-counter-color: ${counterColor};`
+                }
+              })
+            });
+          } catch (e) {
+            // Line may have been deleted
+          }
+          pos += 1;
+        }
+      }
+    }
+
+    if (decorations.length > 0) {
+      const decorationSet = Decoration.set(decorations.sort((a, b) => a.from - b.from));
+      cm.dispatch({
+        effects: setMatchHighlights.of(decorationSet)
+      });
+    }
+  }
+
+  getPinnedColorScheme(pinnedItem) {
+    let scheme;
+    if (pinnedItem.borderColor && pinnedItem.counterBgColor && pinnedItem.counterColor) {
+      scheme = {
+        borderColor: pinnedItem.borderColor,
+        counterBgColor: pinnedItem.counterBgColor,
+        counterColor: pinnedItem.counterColor
+      };
+    } else {
+      const colorIndex = pinnedItem.colorIndex || 0;
+      const schemes = this.settings.pinColorSchemes || DEFAULT_SETTINGS.pinColorSchemes;
+      scheme = { ...schemes[colorIndex % schemes.length] };
+    }
+    // 简化模式下，边框色=文字色，背景色=文字色+计数背景透明度
+    if (this.settings.simplifiedColorScheme) {
+      scheme.borderColor = scheme.counterColor;
+      scheme.counterBgColor = this.hexToRgba(scheme.counterColor, this.settings.counterBgOpacity);
+    }
+    return scheme;
+  }
+
+  getCurrentSelectionColorScheme() {
+    const pinnedItems = this.savedMatchLists.filter(m => m.pinned);
+    const nextColorIndex = pinnedItems.length % this.settings.pinColorSchemes.length;
+    const scheme = { ...this.settings.pinColorSchemes[nextColorIndex] };
+    if (this.settings.simplifiedColorScheme) {
+      scheme.borderColor = scheme.counterColor;
+      scheme.counterBgColor = this.hexToRgba(scheme.counterColor, this.settings.counterBgOpacity);
+    }
+    return scheme;
+  }
+
+  updateMinimapContent() {
+    if (!this.minimapContent) return;
+
+    if (this.isReadingMode()) {
+      const file = this.app.workspace.activeLeaf?.view?.file;
+      if (file) {
+        this.app.vault.read(file).then(content => {
+          this.minimapContent.textContent = content;
+          setTimeout(() => {
+            this.updateViewport();
+          }, 50);
+        }).catch(() => {
+          // Retry after delay
+          setTimeout(() => this.updateMinimapContent(), 200);
+        });
+      } else {
+        setTimeout(() => this.updateMinimapContent(), 200);
+      }
+    } else {
+      const editor = this.getEditor();
+      if (!editor) {
+        setTimeout(() => this.updateMinimapContent(), 200);
+        return;
+      }
+      const content = editor.getValue();
+      if (!content) {
+        setTimeout(() => this.updateMinimapContent(), 200);
+        return;
+      }
+      this.minimapContent.textContent = content;
+      setTimeout(() => {
+        this.updateViewport();
+      }, 50);
+    }
+  }
+
+  updateViewport() {
+    if (!this.minimapContainer || !this.minimapContent) return;
+
+    const containerHeight = this.minimapContainer.clientHeight;
+
+    let lineCount = 0;
+
+    if (this.isReadingMode()) {
+      const content = this.minimapContent.textContent || '';
+      lineCount = content.split('\n').length;
+    } else {
+      const editor = this.getEditor();
+      if (!editor) return;
+      const content = editor.getValue();
+      lineCount = content.split('\n').length;
+    }
+
+    const lineHeightInMinimap = 2;
+    const naturalContentHeight = lineCount * lineHeightInMinimap;
+    const contentHeight = Math.min(containerHeight, naturalContentHeight);
+    
+    this.minimapContent.style.height = `${contentHeight}px`;
+    this.minimapContent.style.fontSize = '2px';
+    this.minimapContent.style.lineHeight = '1';
+
+    if (!this.slider) return;
+
+    let scrollTop, scrollHeight, clientHeight;
+
+    if (this.isReadingMode()) {
+      const scrollEl = this.getReadingViewScrollEl();
+      if (!scrollEl) return;
+      scrollTop = scrollEl.scrollTop;
+      scrollHeight = scrollEl.scrollHeight;
+      clientHeight = scrollEl.clientHeight;
+    } else {
+      const editor = this.getEditor();
+      if (!editor || !editor.cm) return;
+      const scrollDOM = editor.cm.scrollDOM;
+      if (!scrollDOM) return;
+      scrollTop = scrollDOM.scrollTop;
+      scrollHeight = scrollDOM.scrollHeight;
+      clientHeight = scrollDOM.clientHeight;
+    }
+
+    if (scrollHeight <= clientHeight) {
+      this.slider.style.height = `${contentHeight}px`;
+      this.slider.style.top = '0px';
+      return;
+    }
+
+    const scrollRatio = scrollTop / (scrollHeight - clientHeight);
+    const viewportRatio = clientHeight / scrollHeight;
+    const sliderHeight = Math.max(20, viewportRatio * contentHeight);
+    const sliderTop = scrollRatio * (contentHeight - sliderHeight);
+
+    this.slider.style.height = `${sliderHeight}px`;
+    this.slider.style.top = `${sliderTop}px`;
+  }
+
+  onunload() {
+    this.closeSettingsPanel();
+    this.hidePinIcon();
+    this.removeEditorPadding();
+    const statusBar = document.querySelector('.status-bar');
+    if (statusBar) {
+      statusBar.classList.remove('minimap-hide-statusbar');
+    }
+    if (this.boundMouseMove) {
+      document.removeEventListener('mousemove', this.boundMouseMove);
+    }
+    if (this.boundMouseUp) {
+      document.removeEventListener('mouseup', this.boundMouseUp);
+    }
+    if (this.boundWheel && this.minimapContainer) {
+      this.minimapContainer.removeEventListener('wheel', this.boundWheel);
+    }
+    if (this.boundContextMenu && this.minimapContainer) {
+      this.minimapContainer.removeEventListener('contextmenu', this.boundContextMenu);
+    }
+    if (this.boundListWheel && this.matchList) {
+      this.matchList.removeEventListener('wheel', this.boundListWheel);
+    }
+    if (this.boundListWheel && this.previewPanel) {
+      this.previewPanel.removeEventListener('wheel', this.boundListWheel);
+    }
+    if (this.scrollHandler) {
+      document.removeEventListener('scroll', this.scrollHandler, true);
+      if (this.editorScrollEl) {
+        this.editorScrollEl.removeEventListener('scroll', this.scrollHandler);
+      }
+    }
+    if (this.minimapContainer && this.minimapContainer.parentNode) {
+      this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+    }
+    if (this.tooltip && this.tooltip.parentNode) {
+      this.tooltip.parentNode.removeChild(this.tooltip);
+    }
+    if (this.matchList && this.matchList.parentNode) {
+      this.matchList.parentNode.removeChild(this.matchList);
+    }
+    if (this.previewPanel && this.previewPanel.parentNode) {
+      this.previewPanel.parentNode.removeChild(this.previewPanel);
+    }
+    if (this._previewOutsideClickHandler) {
+      document.removeEventListener('mousedown', this._previewOutsideClickHandler);
+    }
+    if (this._listCloseHandler) {
+      document.removeEventListener('mousedown', this._listCloseHandler);
+    }
+    if (this._matchListPositionUpdater) {
+      window.removeEventListener('resize', this._matchListPositionUpdater);
+    }
+    if (this._readingModeMouseUpHandler) {
+      document.removeEventListener('mouseup', this._readingModeMouseUpHandler);
+    }
+    if (this._readingModeKeyUpHandler) {
+      document.removeEventListener('keyup', this._readingModeKeyUpHandler);
+    }
+    this._removeSwiftMatchExportNav();
+    this.clearReadingViewHighlights();
+    this.hideAllMatchListIndicators();
+    // Clean up floating keyword buttons
+    for (const btnData of this._floatingKeywordButtons) {
+      if (btnData.wrapper && btnData.wrapper.parentNode) {
+        btnData.wrapper.parentNode.removeChild(btnData.wrapper);
+      }
+    }
+    this._floatingKeywordButtons = [];
+    if (this.matchListIndicator && this.matchListIndicator.parentNode) {
+      this.matchListIndicator.parentNode.removeChild(this.matchListIndicator);
+    }
+  }
+}
+
+module.exports = MinimapPlugin;
