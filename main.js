@@ -3647,7 +3647,7 @@ class MinimapPlugin extends Plugin {
           continue;
         }
       }
-    }
+
 
     this._searchInProgress = false;
     this._cachedMatchList = fileMap;
