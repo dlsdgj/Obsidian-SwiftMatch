@@ -1,5 +1,17 @@
 # Changelog
 
+## 🆕 v1.3.3 (2026-06-15)
+
+- **Floating Toggle Context Menu** — Right-click the floating toggle to show options: Edit, Hide, Settings
+- **Floating Toggle Edit Panel** — Edit display text, font size, padding, opacity, CSS class name, and custom CSS with live preview; custom styles override default inline styles for full appearance control
+- **Keyword Button Context Menu** — Right-click keyword buttons to show options: Edit, Close
+- **Keyword Button Edit Panel** — Edit display text, CSS class name, and custom CSS with live preview; styles are persisted per keyword
+- **Language Switch Fix** — Fixed null.style error when switching language in settings panel; language switch now reopens the panel instead of reloading the plugin
+- **Language Button Style** — Changed from button to clickable text; removed border, padding, and background
+- **Follow Mouse Mode Fix** — Fixed pin icon constantly following the cursor making it unclickable; now shows at cursor position once and stays fixed
+- **Z-Index Fix** — Hovered floating button now raises z-index to cover other buttons, preventing accidental clicks
+- **Title Cleanup** — Removed (helloworld) from settings panel title
+
 ## v1.3.0 (2026-06-13)
 
 - **i18n Support** — Added CN/EN language switch button in settings panel header; all UI text fully internationalized
