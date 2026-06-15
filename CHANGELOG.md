@@ -1,6 +1,16 @@
 # Changelog
 
-## 🆕 v1.3.3 (2026-06-15)
+## 🆕 v1.3.4 (2026-06-15)
+
+- **Edit Panel Horizontal Layout** — Rearranged display text, font size, padding, and opacity fields into a flex row; added "Get more styles" link to GitHub Discussions
+- **Follow Mouse Offset** — Added pinIconFollowOffsetX/Y settings with live preview box; only visible in follow-mouse mode
+- **Rounded Cap Highlight** — Replaced underline with radial-gradient rounded cap decoration; removed border width setting; added match opacity slider
+- **Floating Toggle Settings Rework** — Removed display text input; toggle button now shows/hides with capsule styling; no longer closes settings panel
+- **Pin Border Residue Fix** — Cleared boxShadow on unpinned items with custom styles to prevent inset border residue
+- **Pin Color Overlap Fix** — Skipped current selection decoration when already pinned to avoid double color overlay
+- **Pin Highlight Missing Fix** — Set filePath on new pinned items; added fallback for legacy items without filePath
+
+## v1.3.3 (2026-06-15)
 
 - **Floating Toggle Context Menu** — Right-click the floating toggle to show options: Edit, Hide, Settings
 - **Floating Toggle Edit Panel** — Edit display text, font size, padding, opacity, CSS class name, and custom CSS with live preview; custom styles override default inline styles for full appearance control

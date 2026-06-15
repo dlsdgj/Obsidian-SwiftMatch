@@ -58,8 +58,7 @@ const DEFAULT_SETTINGS = {
   collapseOnHover: true,
   collapseWidth: 8,
   matchBorderColor: '#ff6600',
-  matchBorderWidth: 2,
-  matchBorderOpacity: 1.0,
+  matchOpacity: 0.6,
   counterOpacity: 1.0,
   counterBgOpacity: 1.0,
   counterColor: '#ffffff',
@@ -85,6 +84,8 @@ const DEFAULT_SETTINGS = {
   pinIconOpacity: 0.8,
   pinIconFixedLeft: null,
   pinIconFixedTop: null,
+  pinIconFollowOffsetX: 15,
+  pinIconFollowOffsetY: -10,
   pinIconText: 'm',
   pinColorSchemes: [
     { borderColor: '#ff6600', counterBgColor: '#ff6600', counterColor: '#ffffff' },
@@ -126,6 +127,7 @@ const I18N = {
     collapseWidth: '折叠宽度 (px)',
     floatingToggleText: '悬浮球显示文字',
     showFloating: '悬浮显示',
+    toggleFloatingBtn: '显示/隐藏悬浮按钮',
     floatingToggleStyle: '悬浮球样式',
     fontSize: '文字大小 (px)',
     paddingH: '水平内边距 (px)',
@@ -139,6 +141,8 @@ const I18N = {
     iconMode: '图标模式',
     followMouse: '跟随鼠标',
     fixedPosition: '固定位置',
+    followOffsetX: '水平偏移 (px)',
+    followOffsetY: '垂直偏移 (px)',
     iconSize: '图标大小 (px)',
     iconOpacity: '图标透明度',
     iconText: '图标文字',
@@ -146,7 +150,7 @@ const I18N = {
     simplifiedColor: '简化配色',
     addColor: '+ 添加配色',
     counterStyle: '计数样式',
-    underline: '下划线 (px)',
+    matchOpacity: '匹配透明度',
     counterOpacity: '计数透明度',
     counterBgOpacity: '计数背景透明度',
     counterFontSize: '计数字体大小',
@@ -221,6 +225,7 @@ const I18N = {
     collapseWidth: 'Collapse Width (px)',
     floatingToggleText: 'Floating Toggle Text',
     showFloating: 'Show Floating',
+    toggleFloatingBtn: 'Show/Hide Floating Button',
     floatingToggleStyle: 'Floating Toggle Style',
     fontSize: 'Font Size (px)',
     paddingH: 'Horizontal Padding (px)',
@@ -234,6 +239,8 @@ const I18N = {
     iconMode: 'Icon Mode',
     followMouse: 'Follow Mouse',
     fixedPosition: 'Fixed Position',
+    followOffsetX: 'Horizontal Offset (px)',
+    followOffsetY: 'Vertical Offset (px)',
     iconSize: 'Icon Size (px)',
     iconOpacity: 'Icon Opacity',
     iconText: 'Icon Text',
@@ -241,7 +248,7 @@ const I18N = {
     simplifiedColor: 'Simplified Colors',
     addColor: '+ Add Color',
     counterStyle: 'Counter Style',
-    underline: 'Underline (px)',
+    matchOpacity: 'Match Opacity',
     counterOpacity: 'Counter Opacity',
     counterBgOpacity: 'Counter BG Opacity',
     counterFontSize: 'Counter Font Size',
@@ -725,11 +732,8 @@ class MinimapPlugin extends Plugin {
             <input type="number" id="minimap-collapsewidth" value="${this.settings.collapseWidth}" min="4" max="50">
           </div>
           <div class="minimap-settings-row">
-            <label>${t('floatingToggleText')}</label>
-            <div class="minimap-settings-row-controls">
-              <input type="text" id="minimap-floatingtoggletext" value="${this.settings.floatingToggleText || 'Swift'}" style="width:80px;text-align:center;">
-              <button class="minimap-floating-toggle-btn" id="minimap-showfloatingtoggle" title="${t('showFloating')}">⚡</button>
-            </div>
+            <label>${t('toggleFloatingBtn')}</label>
+            <button class="minimap-floating-toggle-btn" id="minimap-showfloatingtoggle" style="position:relative;padding:2px 10px;border-radius:9999px;background-color:rgba(240,100,120,0.08);box-shadow:inset 0 0 0 1px rgba(240,120,100,0.4),0 2px 10px rgba(0,0,0,0.05);cursor:pointer;font-weight:800;background:linear-gradient(135deg,#f2709c,#ff9472,#f5af19,#f2709c);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:12px;border:none;outline:none;">Swift</button>
           </div>
           <div class="minimap-settings-section-title">${t('floatingToggleStyle')}</div>
           <div class="minimap-settings-row">
@@ -789,6 +793,20 @@ class MinimapPlugin extends Plugin {
             <label>${t('iconText')}</label>
             <input type="text" id="minimap-pinicontext" value="${this.settings.pinIconText || 'm'}" style="width:40px;text-align:center;">
           </div>
+          <div id="minimap-follow-offset-section" style="display:${this.settings.pinIconMode === 'follow' ? 'block' : 'none'};">
+            <div class="minimap-settings-row">
+              <label>${t('followOffsetX')}</label>
+              <input type="number" id="minimap-piniconfollowoffsetx" value="${this.settings.pinIconFollowOffsetX ?? 15}" min="-100" max="100" step="1">
+            </div>
+            <div class="minimap-settings-row">
+              <label>${t('followOffsetY')}</label>
+              <input type="number" id="minimap-piniconfollowoffsety" value="${this.settings.pinIconFollowOffsetY ?? -10}" min="-100" max="100" step="1">
+            </div>
+            <div id="minimap-follow-offset-preview" style="position:relative;width:120px;height:80px;margin:6px auto;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-secondary);overflow:hidden;">
+              <div id="minimap-follow-offset-cursor" style="position:absolute;width:6px;height:6px;background:var(--text-muted);border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%);"></div>
+              <div id="minimap-follow-offset-icon" style="position:absolute;width:14px;height:14px;background:var(--interactive-accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:white;font-weight:bold;">m</div>
+            </div>
+          </div>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('colorSchemes')}</div>
           <div class="minimap-settings-row">
             <label>${t('simplifiedColor')}</label>
@@ -798,8 +816,9 @@ class MinimapPlugin extends Plugin {
           <button id="minimap-add-colorscheme" style="width:100%;margin-top:6px;padding:4px 8px;cursor:pointer;">${t('addColor')}</button>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('counterStyle')}</div>
           <div class="minimap-settings-row">
-            <label>${t('underline')}</label>
-            <input type="number" id="minimap-matchborderwidth" value="${this.settings.matchBorderWidth}" min="1" max="5">
+            <label>${t('matchOpacity')}</label>
+            <input type="range" id="minimap-matchopacity" value="${this.settings.matchOpacity ?? 0.6}" min="0.1" max="1" step="0.05">
+            <span id="minimap-matchopacity-value">${this.settings.matchOpacity ?? 0.6}</span>
           </div>
           <div class="minimap-settings-row">
             <label>${t('counterOpacity')}</label>
@@ -981,14 +1000,13 @@ class MinimapPlugin extends Plugin {
       contentopacity: this.settingsPanel.querySelector('#minimap-contentopacity'),
       collapseonhover: this.settingsPanel.querySelector('#minimap-collapseonhover'),
       collapsewidth: this.settingsPanel.querySelector('#minimap-collapsewidth'),
-      matchborderwidth: this.settingsPanel.querySelector('#minimap-matchborderwidth'),
+      matchopacity: this.settingsPanel.querySelector('#minimap-matchopacity'),
       counteropacity: this.settingsPanel.querySelector('#minimap-counteropacity'),
       counterbgopacity: this.settingsPanel.querySelector('#minimap-counterbgopacity'),
       countersize: this.settingsPanel.querySelector('#minimap-countersize'),
       counterpaddingh: this.settingsPanel.querySelector('#minimap-counterpaddingh'),
       counterpaddingv: this.settingsPanel.querySelector('#minimap-counterpaddingv'),
       countertopoffset: this.settingsPanel.querySelector('#minimap-countertopoffset'),
-      floatingtoggletext: this.settingsPanel.querySelector('#minimap-floatingtoggletext'),
       floatingtogglefontsize: this.settingsPanel.querySelector('#minimap-floatingtogglefontsize'),
       floatingtogglepaddingh: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingh'),
       floatingtogglepaddingv: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingv'),
@@ -1000,12 +1018,15 @@ class MinimapPlugin extends Plugin {
       piniconsize: this.settingsPanel.querySelector('#minimap-piniconsize'),
       piniconopacity: this.settingsPanel.querySelector('#minimap-piniconopacity'),
       pinicontext: this.settingsPanel.querySelector('#minimap-pinicontext'),
+      piniconfollowoffsetx: this.settingsPanel.querySelector('#minimap-piniconfollowoffsetx'),
+      piniconfollowoffsety: this.settingsPanel.querySelector('#minimap-piniconfollowoffsety'),
       simplifiedcolorscheme: this.settingsPanel.querySelector('#minimap-simplifiedcolorscheme'),
       searchwordcountmin: this.settingsPanel.querySelector('#minimap-searchwordcountmin'),
       searchwordcountmax: this.settingsPanel.querySelector('#minimap-searchwordcountmax')
     };
 
     const counterBgOpacityValue = this.settingsPanel.querySelector('#minimap-counterbgopacity-value');
+    const matchOpacityValue = this.settingsPanel.querySelector('#minimap-matchopacity-value');
     
     const opacityValue = this.settingsPanel.querySelector('#minimap-opacity-value');
     const contentOpacityValue = this.settingsPanel.querySelector('#minimap-contentopacity-value');
@@ -1024,14 +1045,14 @@ class MinimapPlugin extends Plugin {
       this.settings.contentOpacity = parseFloat(inputs.contentopacity.value) || DEFAULT_SETTINGS.contentOpacity;
       this.settings.collapseOnHover = inputs.collapseonhover.checked;
       this.settings.collapseWidth = parseFloat(inputs.collapsewidth.value) || DEFAULT_SETTINGS.collapseWidth;
-      this.settings.matchBorderWidth = parseFloat(inputs.matchborderwidth.value) || DEFAULT_SETTINGS.matchBorderWidth;
+      this.settings.matchOpacity = parseFloat(inputs.matchopacity.value) || DEFAULT_SETTINGS.matchOpacity;
       this.settings.counterOpacity = parseFloat(inputs.counteropacity.value) || DEFAULT_SETTINGS.counterOpacity;
       this.settings.counterBgOpacity = parseFloat(inputs.counterbgopacity.value) || DEFAULT_SETTINGS.counterBgOpacity;
       this.settings.counterSize = parseFloat(inputs.countersize.value) || DEFAULT_SETTINGS.counterSize;
       this.settings.counterPaddingH = parseFloat(inputs.counterpaddingh.value) || DEFAULT_SETTINGS.counterPaddingH;
       this.settings.counterPaddingV = isNaN(parseFloat(inputs.counterpaddingv.value)) ? DEFAULT_SETTINGS.counterPaddingV : parseFloat(inputs.counterpaddingv.value);
       this.settings.counterTopOffset = isNaN(parseFloat(inputs.countertopoffset.value)) ? DEFAULT_SETTINGS.counterTopOffset : parseFloat(inputs.countertopoffset.value);
-      this.settings.floatingToggleText = inputs.floatingtoggletext.value || 'Swift';
+
       this.settings.floatingToggleFontSize = parseFloat(inputs.floatingtogglefontsize.value) || DEFAULT_SETTINGS.floatingToggleFontSize;
       this.settings.floatingTogglePaddingH = parseFloat(inputs.floatingtogglepaddingh.value) || DEFAULT_SETTINGS.floatingTogglePaddingH;
       this.settings.floatingTogglePaddingV = parseFloat(inputs.floatingtogglepaddingv.value) ?? DEFAULT_SETTINGS.floatingTogglePaddingV;
@@ -1045,9 +1066,12 @@ class MinimapPlugin extends Plugin {
       this.settings.pinIconSize = parseFloat(inputs.piniconsize.value) || DEFAULT_SETTINGS.pinIconSize;
       this.settings.pinIconOpacity = parseFloat(inputs.piniconopacity.value) || DEFAULT_SETTINGS.pinIconOpacity;
       this.settings.pinIconText = inputs.pinicontext.value || DEFAULT_SETTINGS.pinIconText;
+      this.settings.pinIconFollowOffsetX = parseInt(inputs.piniconfollowoffsetx.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
+      this.settings.pinIconFollowOffsetY = parseInt(inputs.piniconfollowoffsety.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
       this.settings.simplifiedColorScheme = inputs.simplifiedcolorscheme.checked;
       opacityValue.textContent = this.settings.opacity.toFixed(1);
       contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
+      matchOpacityValue.textContent = this.settings.matchOpacity.toFixed(2);
       counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
       counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
       pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
@@ -1063,6 +1087,29 @@ class MinimapPlugin extends Plugin {
     Object.values(inputs).forEach(input => {
       input.addEventListener('input', updateSettings);
     });
+
+    const followOffsetSection = this.settingsPanel.querySelector('#minimap-follow-offset-section');
+    const followOffsetIcon = this.settingsPanel.querySelector('#minimap-follow-offset-icon');
+    const updateFollowOffsetVisibility = () => {
+      followOffsetSection.style.display = inputs.piniconmode.value === 'follow' ? 'block' : 'none';
+    };
+    const updateFollowOffsetPreview = () => {
+      const ox = parseInt(inputs.piniconfollowoffsetx.value) || 0;
+      const oy = parseInt(inputs.piniconfollowoffsety.value) || 0;
+      const previewW = 120, previewH = 80;
+      const iconSize = 14;
+      const cx = previewW / 2;
+      const cy = previewH / 2;
+      const scale = 0.5;
+      const ix = cx + ox * scale - iconSize / 2;
+      const iy = cy + oy * scale - iconSize / 2;
+      followOffsetIcon.style.left = `${Math.max(0, Math.min(previewW - iconSize, ix))}px`;
+      followOffsetIcon.style.top = `${Math.max(0, Math.min(previewH - iconSize, iy))}px`;
+    };
+    inputs.piniconmode.addEventListener('change', updateFollowOffsetVisibility);
+    inputs.piniconfollowoffsetx.addEventListener('input', updateFollowOffsetPreview);
+    inputs.piniconfollowoffsety.addEventListener('input', updateFollowOffsetPreview);
+    updateFollowOffsetPreview();
     
     const resetBtn = this.settingsPanel.querySelector('#minimap-reset');
     resetBtn.addEventListener('click', () => {
@@ -1077,14 +1124,14 @@ class MinimapPlugin extends Plugin {
       inputs.contentopacity.value = this.settings.contentOpacity;
       inputs.collapseonhover.checked = this.settings.collapseOnHover;
       inputs.collapsewidth.value = this.settings.collapseWidth;
-      inputs.matchborderwidth.value = this.settings.matchBorderWidth;
+      inputs.matchopacity.value = this.settings.matchOpacity ?? DEFAULT_SETTINGS.matchOpacity;
       inputs.counteropacity.value = this.settings.counterOpacity;
       inputs.counterbgopacity.value = this.settings.counterBgOpacity;
       inputs.countersize.value = this.settings.counterSize;
       inputs.counterpaddingh.value = this.settings.counterPaddingH;
       inputs.counterpaddingv.value = this.settings.counterPaddingV;
       inputs.countertopoffset.value = this.settings.counterTopOffset;
-      inputs.floatingtoggletext.value = this.settings.floatingToggleText || 'Swift';
+
       inputs.floatingtogglefontsize.value = this.settings.floatingToggleFontSize;
       inputs.floatingtogglepaddingh.value = this.settings.floatingTogglePaddingH;
       inputs.floatingtogglepaddingv.value = this.settings.floatingTogglePaddingV;
@@ -1096,11 +1143,14 @@ class MinimapPlugin extends Plugin {
       inputs.piniconsize.value = this.settings.pinIconSize;
       inputs.piniconopacity.value = this.settings.pinIconOpacity;
       inputs.pinicontext.value = this.settings.pinIconText || 'm';
+      inputs.piniconfollowoffsetx.value = this.settings.pinIconFollowOffsetX ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
+      inputs.piniconfollowoffsety.value = this.settings.pinIconFollowOffsetY ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
       inputs.simplifiedcolorscheme.checked = this.settings.simplifiedColorScheme;
       inputs.searchwordcountmin.value = this.settings.searchWordCountMin ?? 0;
       inputs.searchwordcountmax.value = this.settings.searchWordCountMax ?? 0;
       opacityValue.textContent = this.settings.opacity.toFixed(1);
       contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
+      matchOpacityValue.textContent = this.settings.matchOpacity.toFixed(2);
       counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
       counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
       pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
@@ -1114,8 +1164,17 @@ class MinimapPlugin extends Plugin {
 
     const floatingToggleBtn = this.settingsPanel.querySelector('#minimap-showfloatingtoggle');
     floatingToggleBtn.addEventListener('click', () => {
-      this.createFloatingToggle();
-      this.closeSettingsPanel();
+      if (this.floatingToggleWrapper) {
+        this.floatingToggleWrapper.remove();
+        this.floatingToggleWrapper = null;
+        this.floatingToggle = null;
+        this.floatingToggleText = null;
+        this.floatingSearchBox = null;
+        this.settings.floatingToggleVisible = false;
+        this.saveSettings();
+      } else {
+        this.createFloatingToggle();
+      }
     });
 
     // Render color schemes
@@ -3421,8 +3480,10 @@ class MinimapPlugin extends Plugin {
     }
 
     if (this.settings.pinIconMode === 'follow') {
-      icon.style.left = `${this._lastMouseX + 15}px`;
-      icon.style.top = `${this._lastMouseY - 10}px`;
+      const ox = this.settings.pinIconFollowOffsetX ?? 15;
+      const oy = this.settings.pinIconFollowOffsetY ?? -10;
+      icon.style.left = `${this._lastMouseX + ox}px`;
+      icon.style.top = `${this._lastMouseY + oy}px`;
     } else {
       // Fixed position: use saved position or default to right side of editor
       if (this.settings.pinIconFixedLeft != null && this.settings.pinIconFixedTop != null) {
@@ -3551,8 +3612,10 @@ class MinimapPlugin extends Plugin {
 
     // Follow mouse mode: show icon at current mouse position, then stay fixed
     if (this.settings.pinIconMode === 'follow') {
-      icon.style.left = `${this._lastMouseX + 15}px`;
-      icon.style.top = `${this._lastMouseY - 10}px`;
+      const ox = this.settings.pinIconFollowOffsetX ?? 15;
+      const oy = this.settings.pinIconFollowOffsetY ?? -10;
+      icon.style.left = `${this._lastMouseX + ox}px`;
+      icon.style.top = `${this._lastMouseY + oy}px`;
     }
   }
 
@@ -3571,6 +3634,9 @@ class MinimapPlugin extends Plugin {
     const nextColorIndex = pinnedItems.length % this.settings.pinColorSchemes.length;
     const colorScheme = this.settings.pinColorSchemes[nextColorIndex];
 
+    const currentFile = this.app.workspace.activeLeaf?.view?.file;
+    const currentFilePath = currentFile ? currentFile.path : '';
+
     const existingIndex = this.savedMatchLists.findIndex(m => m.selection === this.currentSelection);
     if (existingIndex >= 0) {
       this.savedMatchLists[existingIndex].pinned = true;
@@ -3578,6 +3644,10 @@ class MinimapPlugin extends Plugin {
       this.savedMatchLists[existingIndex].borderColor = colorScheme.borderColor;
       this.savedMatchLists[existingIndex].counterBgColor = colorScheme.counterBgColor;
       this.savedMatchLists[existingIndex].counterColor = colorScheme.counterColor;
+      if (!this.savedMatchLists[existingIndex].filePath) {
+        this.savedMatchLists[existingIndex].filePath = currentFilePath;
+        this.savedMatchLists[existingIndex].fileName = currentFile ? currentFile.basename : '';
+      }
     } else {
       this.savedMatchLists.unshift({
         selection: this.currentSelection,
@@ -3587,8 +3657,8 @@ class MinimapPlugin extends Plugin {
         counterBgColor: colorScheme.counterBgColor,
         counterColor: colorScheme.counterColor,
         matchCount: 0,
-        filePath: '',
-        fileName: ''
+        filePath: currentFilePath,
+        fileName: currentFile ? currentFile.basename : ''
       });
     }
 
@@ -3967,9 +4037,11 @@ class MinimapPlugin extends Plugin {
     this.minimapContainer.appendChild(fragment);
 
     if (isReading) {
-      // Add pinned highlights first, then current selection on top
       this.showPinnedDecorations();
-      this.addReadingViewHighlights(selection, totalMatches, this.getCurrentSelectionColorScheme());
+      const isCurrentPinned = this.currentSelection && this.savedMatchLists.some(m => m.selection === this.currentSelection && m.pinned);
+      if (!isCurrentPinned) {
+        this.addReadingViewHighlights(selection, totalMatches, this.getCurrentSelectionColorScheme());
+      }
     } else {
       const editor = this.getEditor();
       if (editor && editor.cm) {
@@ -4006,7 +4078,7 @@ class MinimapPlugin extends Plugin {
     }
 
     const borderColor = colorScheme ? colorScheme.borderColor : this.getCurrentSelectionColorScheme().borderColor;
-    const borderWidth = this.settings.matchBorderWidth;
+
     const counterOpacity = this.settings.counterOpacity;
     const counterBgOpacity = this.settings.counterBgOpacity;
     const counterColor = colorScheme ? colorScheme.counterColor : this.getCurrentSelectionColorScheme().counterColor;
@@ -4016,7 +4088,7 @@ class MinimapPlugin extends Plugin {
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
     readingEl.style.setProperty('--minimap-match-color', borderColor);
-    readingEl.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+
     readingEl.style.setProperty('--minimap-counter-opacity', counterOpacity);
     readingEl.style.setProperty('--minimap-counter-color', counterColor);
     readingEl.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
@@ -4052,7 +4124,9 @@ class MinimapPlugin extends Plugin {
         const mark = document.createElement('mark');
         mark.className = `minimap-reading-match${hideCounter ? ' minimap-hide-counter' : ''}`;
         mark.textContent = text.substring(matchPos, matchPos + searchText.length);
-        mark.style.background = 'transparent';
+        const matchOpacity = this.settings.matchOpacity ?? 0.6;
+        const c = this.hexToRgba(borderColor, matchOpacity);
+        mark.style.cssText = `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${c} 98%,#0000) bottom left,linear-gradient(${c} 0 0) bottom,radial-gradient(farthest-side,${c} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;`;
         mark.dataset.matchIndex = ++matchIndex;
         mark.dataset.matchTotal = totalMatches;
         mark.dataset.match = `${matchIndex}/${totalMatches}`;
@@ -4240,7 +4314,9 @@ class MinimapPlugin extends Plugin {
     // Clear pin border if not pinned
     if (!isPinned && this.floatingToggle) {
       const hasCustomStyle = !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
-      if (!hasCustomStyle) {
+      if (hasCustomStyle) {
+        this.floatingToggle.style.boxShadow = '';
+      } else {
         this.floatingToggle.style.boxShadow = 'inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05)';
       }
     }
@@ -6668,7 +6744,7 @@ class MinimapPlugin extends Plugin {
 
     const scheme = this.getCurrentSelectionColorScheme();
     const borderColor = scheme.borderColor;
-    const borderWidth = this.settings.matchBorderWidth;
+    const matchOpacity = this.settings.matchOpacity ?? 0.6;
     const counterOpacity = this.settings.counterOpacity;
     const counterBgOpacity = this.settings.counterBgOpacity;
     const counterColor = scheme.counterColor;
@@ -6678,7 +6754,7 @@ class MinimapPlugin extends Plugin {
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
     cm.scrollDOM.style.setProperty('--minimap-match-color', borderColor);
-    cm.scrollDOM.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+
     cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
     cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
     cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
@@ -6703,7 +6779,7 @@ class MinimapPlugin extends Plugin {
           class: `minimap-editor-match${hideCounter ? ' minimap-hide-counter' : ''}`,
           attributes: {
             'data-match': label,
-            'style': `border-bottom: ${borderWidth}px solid ${borderColor}; padding-bottom: 1px;`
+            'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(borderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;`
           }
         })
       });
@@ -6718,7 +6794,7 @@ class MinimapPlugin extends Plugin {
   addEditorDecorationsWithPinned(cm, matchLines, totalMatches) {
     if (!cm || !cm.scrollDOM) return;
 
-    const borderWidth = this.settings.matchBorderWidth;
+    const matchOpacity = this.settings.matchOpacity ?? 0.6;
     const counterOpacity = this.settings.counterOpacity;
     const counterBgOpacity = this.settings.counterBgOpacity;
     const counterColor = this.settings.counterColor;
@@ -6727,7 +6803,7 @@ class MinimapPlugin extends Plugin {
     const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
-    cm.scrollDOM.style.setProperty('--minimap-match-border-width', `${borderWidth}px`);
+
     cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
     cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
     cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
@@ -6745,7 +6821,7 @@ class MinimapPlugin extends Plugin {
     const currentFilePath = currentFile ? currentFile.path : null;
 
     // Add pinned decorations first
-    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || item.filePath === currentFilePath));
+    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || !item.filePath || item.filePath === currentFilePath));
     for (const pinnedItem of pinnedItems) {
       const colorScheme = this.getPinnedColorScheme(pinnedItem);
       const pBorderColor = colorScheme.borderColor;
@@ -6783,7 +6859,7 @@ class MinimapPlugin extends Plugin {
                 attributes: {
                   'data-selection': pinnedItem.selection,
                   'data-match': `${matchIndex}/${totalPinnedMatches}`,
-                  'style': `border-bottom: ${borderWidth}px solid ${pBorderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${pCounterBgColor}; --minimap-counter-color: ${pCounterColor};`
+                  'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(pBorderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(pBorderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(pBorderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${pCounterBgColor};--minimap-counter-color: ${pCounterColor};`
                 }
               })
             });
@@ -6794,31 +6870,36 @@ class MinimapPlugin extends Plugin {
     }
 
     // Add current selection decorations on top (using color scheme)
-    const currentColorScheme = this.getCurrentSelectionColorScheme();
-    const currentBorderColor = currentColorScheme.borderColor;
-    const currentCounterBgColor = currentColorScheme.counterBgColor;
-    const currentCounterColor = currentColorScheme.counterColor;
+    // Skip if current selection is already pinned (pinned decoration already covers it)
+    const isCurrentPinned = this.currentSelection && this.savedMatchLists.some(m => m.selection === this.currentSelection && m.pinned);
 
-    for (let idx = 0; idx < matchLines.length; idx++) {
-      const match = matchLines[idx];
-      try {
-        const line = cm.state.doc.line(match.line + 1);
-        const from = line.from + match.pos;
-        const to = from + this.currentSelection.length;
-        const label = `${match.index}/${totalMatches}`;
+    if (!isCurrentPinned) {
+      const currentColorScheme = this.getCurrentSelectionColorScheme();
+      const currentBorderColor = currentColorScheme.borderColor;
+      const currentCounterBgColor = currentColorScheme.counterBgColor;
+      const currentCounterColor = currentColorScheme.counterColor;
 
-        allDecorations.push({
-          from: from,
-          to: to,
-          value: Decoration.mark({
-            class: 'minimap-editor-match',
-            attributes: {
-              'data-match': label,
-              'style': `border-bottom: ${borderWidth}px solid ${currentBorderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${currentCounterBgColor}; --minimap-counter-color: ${currentCounterColor};`
-            }
-          })
-        });
-      } catch (e) {}
+      for (let idx = 0; idx < matchLines.length; idx++) {
+        const match = matchLines[idx];
+        try {
+          const line = cm.state.doc.line(match.line + 1);
+          const from = line.from + match.pos;
+          const to = from + this.currentSelection.length;
+          const label = `${match.index}/${totalMatches}`;
+
+          allDecorations.push({
+            from: from,
+            to: to,
+            value: Decoration.mark({
+              class: 'minimap-editor-match',
+              attributes: {
+                'data-match': label,
+                'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(currentBorderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${currentCounterBgColor};--minimap-counter-color: ${currentCounterColor};`
+              }
+            })
+          });
+        } catch (e) {}
+      }
     }
 
     if (allDecorations.length > 0) {
@@ -6860,7 +6941,7 @@ class MinimapPlugin extends Plugin {
   showPinnedDecorations() {
     const currentFile = this.app.workspace.activeLeaf?.view?.file;
     const currentFilePath = currentFile ? currentFile.path : null;
-    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || item.filePath === currentFilePath));
+    const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || !item.filePath || item.filePath === currentFilePath));
     if (pinnedItems.length === 0) return;
 
     if (this.isReadingMode()) {
@@ -6880,7 +6961,7 @@ class MinimapPlugin extends Plugin {
 
     this.registerEditorField();
 
-    const borderWidth = this.settings.matchBorderWidth;
+    const matchOpacity = this.settings.matchOpacity ?? 0.6;
 
     const decorations = [];
 
@@ -6923,7 +7004,7 @@ class MinimapPlugin extends Plugin {
                 attributes: {
                   'data-selection': pinnedItem.selection,
                   'data-match': `${matchIndex}/${totalPinnedMatches}`,
-                  'style': `border-bottom: ${borderWidth}px solid ${borderColor}; padding-bottom: 1px; --minimap-counter-bgcolor: ${this.hexToRgba(counterBgColor, this.settings.counterBgOpacity)}; --minimap-counter-color: ${counterColor};`
+                  'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(borderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${this.hexToRgba(counterBgColor, this.settings.counterBgOpacity)};--minimap-counter-color: ${counterColor};`
                 }
               })
             });

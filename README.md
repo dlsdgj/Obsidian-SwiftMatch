@@ -4,58 +4,45 @@
 
 #SwiftMatch-en
 ---
-An Obsidian plugin for quick text search and highlight across your vault. Select text → instantly find matches in all documents → navigate and highlight with counters.
+An Obsidian plugin for quick text search and highlight across your vault.
 
 ## Features
 
-### 🔍 Selection Match & Search
+- **Swift Seek** — Select text, instantly highlight all matches on the current page with a live counter
 
-- **Selection Match** — Select text in the editor, matching results appear instantly across the vault
-- **Floating Toggle** — A floating button shows match count, click to open the search result list
-- **Recent Searches** — Recent search keywords are saved and displayed as floating keyword buttons
-- **Search Box** — Built-in search box on the floating toggle for manual keyword input
-- **Exhaustive Mode** — Full-text search using Obsidian's built-in search API with snippet extraction
+  ![Swift Seek](assets/swift-seek.gif)
 
-### 📋 Match Result List
+- **Pin Tally** — Pin keywords to track match counts across multiple terms at a glance
 
-- **File Grouped Results** — Matches grouped by file, showing file path (with directory and extension)
-- **Heading & Tag Matches** — Matches headings and tags in documents, not just content
-- **File Name Matching** — Search keywords also match file names (including extension)
-- **Open Document** — Click "Open Document" button to jump to the match location with text selected and highlighted
-- **Copy Match Text** — Quick copy button for each match entry
-- **Export as Markdown** — Export all match results as a Markdown file
+- **Vault Scan** — Background search across your entire vault the moment you select text; floating toggle shows matched document count / total matches
 
-### 🎨 Highlight & Counter
+  ![Vault Scan](assets/vault-scan.gif)
 
-- **Custom Highlight Styles** — Border color, counter background, counter text color with multi-color scheme support
-- **Simplified Color Scheme** — Auto-sync border and background colors from text color
-- **Match Counter** — Each match shows a numbered counter (e.g. 1/5) with customizable position and size
-- **Pin Matches** — Pin a keyword to persist its highlight across sessions; pinned items only show in their source document (local mode)
-- **Pin Icon** — A pin icon appears near the cursor for quick pin/unpin actions
+- **Keyword Fleet** — Float multiple keyword groups independently on screen, each with its own counter
 
-### 🌐 Internationalization
-
-- **CN/EN Language Switch** — Click the language button in the top-left corner of settings panel to switch between Chinese and English
-- **Full i18n Coverage** — All UI text including settings labels, tooltips, and notices are translated
-
-### ⚙️ Settings
-
-- **Minimap** — Configurable minimap with slider, opacity, and color settings
-- **Floating Toggle** — Customizable text, font size, padding, and opacity
-- **Search Limits** — Minimum and maximum word count for search triggers
-- **Counter Style** — Underline width, counter opacity, font size, padding, and offset
+  ![Keyword Fleet](assets/keyword-fleet.gif)
 
 ## Installation
 
-1. Download `main.js`, `styles.css`, and `manifest.json`
-2. Create a `swift-match` folder in your Obsidian vault's `.obsidian/plugins/` directory
-3. Place the downloaded files in that folder
-4. Enable "SwiftMatch" in Obsidian Settings → Community Plugins
+Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, then click Install and Enable.
 
 ## Changelog
 
 <details>
 <summary>Changelog</summary>
+
+<details>
+<summary>v1.3.4 (2026-06-15)</summary>
+
+- **Edit Panel Horizontal Layout** — Rearranged display text, font size, padding, and opacity fields into a flex row; added "Get more styles" link to GitHub Discussions
+- **Follow Mouse Offset** — Added pinIconFollowOffsetX/Y settings with live preview box; only visible in follow-mouse mode
+- **Rounded Cap Highlight** — Replaced underline with radial-gradient rounded cap decoration; removed border width setting; added match opacity slider
+- **Floating Toggle Settings Rework** — Removed display text input; toggle button now shows/hides with capsule styling; no longer closes settings panel
+- **Pin Border Residue Fix** — Cleared boxShadow on unpinned items with custom styles to prevent inset border residue
+- **Pin Color Overlap Fix** — Skipped current selection decoration when already pinned to avoid double color overlay
+- **Pin Highlight Missing Fix** — Set filePath on new pinned items; added fallback for legacy items without filePath
+
+</details>
 
 <details>
 <summary>v1.3.3 (2026-06-15)</summary>
@@ -112,58 +99,45 @@ An Obsidian plugin for quick text search and highlight across your vault. Select
 
 #SwiftMatch-zh
 ---
-一个 Obsidian 快速搜索高亮插件。选中文本 → 立即查找库中所有匹配 → 导航并高亮显示计数。
+一个 Obsidian 快速搜索高亮插件。
 
 ## 功能
 
-### 🔍 划词匹配与搜索
+- **即划即搜** — 选中文本，当前页面即时显示所有匹配并计数
 
-- **划词匹配** — 在编辑器中选中文本，立即显示库中所有匹配结果
-- **悬浮球** — 悬浮按钮显示匹配计数，点击打开搜索结果列表
-- **最近搜索** — 保存最近搜索的关键词，显示为悬浮关键词按钮
-- **搜索框** — 悬浮球内置搜索框，支持手动输入关键词
-- **全库搜索模式** — 使用 Obsidian 内置搜索 API 进行全文搜索，提取上下文片段
+  ![即划即搜](assets/swift-seek.gif)
 
-### 📋 匹配结果列表
+- **固定计数** — 固定关键词，同时查看多个关键词的匹配次数
 
-- **按文件分组** — 匹配结果按文件分组，显示完整文件路径（含目录和后缀）
-- **标题与标签匹配** — 匹配文档中的标题和标签，不仅仅是内容
-- **文件名匹配** — 搜索关键词也会匹配文件名（含后缀）
-- **打开文档** — 点击"打开文档"按钮跳转到匹配位置，选中文本并以自定义样式高亮
-- **复制匹配文本** — 每条匹配结果的快速复制按钮
-- **导出为 Markdown** — 将所有匹配结果导出为 Markdown 文件
+- **搜索全库** — 使用 Obsidian 搜索 API，选中文字即后台搜索，悬浮按钮显示匹配文档数/总匹配数量
 
-### 🎨 高亮与计数
+  ![搜索全库](assets/vault-scan.gif)
 
-- **自定义高亮样式** — 边框颜色、计数背景、计数文字颜色，支持多配色方案
-- **简化配色** — 自动从文字颜色同步边框和背景色
-- **匹配计数器** — 每个匹配显示编号计数器（如 1/5），可自定义位置和大小
-- **固定匹配** — 固定关键词以持久显示高亮；固定项仅在来源文档中显示（局部模式）
-- **固定图标** — 光标附近显示固定图标，可快速固定/取消固定
+- **多组关键词悬浮** — 搜索关键词可单独悬浮显示，支持同时悬浮多组关键词
 
-### 🌐 国际化
-
-- **中英文切换** — 点击设置面板左上角的语言按钮切换中英文界面
-- **完整 i18n 覆盖** — 所有 UI 文本（包括设置标签、工具提示和通知）均已翻译
-
-### ⚙️ 设置
-
-- **小地图** — 可配置的小地图，包括滑块、透明度和颜色设置
-- **悬浮球** — 自定义文字、字体大小、内边距和透明度
-- **搜索限制** — 搜索触发的最少和最多字数限制
-- **计数样式** — 下划线宽度、计数透明度、字体大小、内边距和偏移
+  ![多组关键词悬浮](assets/keyword-fleet.gif)
 
 ## 安装
 
-1. 下载 `main.js`、`styles.css` 和 `manifest.json`
-2. 在 Obsidian 库的 `.obsidian/plugins/` 目录下创建 `swift-match` 文件夹
-3. 将下载的文件放入该文件夹
-4. 在 Obsidian 设置 → 社区插件中启用"SwiftMatch"
+在 Obsidian 设置 → 社区插件 → 浏览中搜索"SwiftMatch"，点击安装并启用即可。
 
 ## 更新日志
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.4 (2026-06-15)</summary>
+
+- **编辑面板横向排列** — 显示文字、字体大小、内边距、透明度改为横向布局；自定义样式标题后添加"获取更多样式"链接
+- **跟随鼠标偏移设置** — 新增 pinIconFollowOffsetX/Y 偏移设置，含实时预览框；仅跟随鼠标模式显示
+- **圆帽高亮样式** — 下划线改为圆帽底部装饰；移除下划线宽度设置；新增匹配透明度滑块
+- **悬浮球设置面板改造** — 移除显示文字输入框；按钮改为胶囊样式切换显示/隐藏，不再关闭设置面板
+- **固定边框残留修复** — 非固定且有自定义样式时清除 boxShadow，避免边框残留
+- **固定颜色叠加修复** — 当前选中文本已固定时跳过装饰，避免双层颜色叠加
+- **固定高亮不显示修复** — 为新固定项设置 filePath；兼容无 filePath 的旧数据
+
+</details>
 
 <details>
 <summary>v1.3.3 (2026-06-15)</summary>

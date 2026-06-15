@@ -57,7 +57,7 @@
   right: 0;
   background-color: var(--text-muted);
   opacity: 0.35;
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: grab;
   transition: opacity 0.15s;
   z-index: 10;
@@ -133,14 +133,28 @@
 
 .minimap-editor-match {
   position: relative;
-  border-bottom: var(--minimap-match-border-width, 2px) solid var(--minimap-match-color, #ff6600);
-  padding-bottom: 1px;
+  margin: 0 -0.2em;
+  padding: 0 0.2em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom left,
+              linear-gradient(var(--minimap-match-color, #ff6600) 0 0) bottom,
+              radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom right;
+  background-size: 8px 8px, calc(100% - 8px) 8px;
+  background-repeat: no-repeat;
 }
 
 mark.minimap-reading-match {
   position: relative;
-  border-bottom: var(--minimap-match-border-width, 2px) solid var(--minimap-match-color, #ff6600);
-  padding-bottom: 1px;
+  margin: 0 -0.2em;
+  padding: 0 0.2em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom left,
+              linear-gradient(var(--minimap-match-color, #ff6600) 0 0) bottom,
+              radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom right;
+  background-size: 8px 8px, calc(100% - 8px) 8px;
+  background-repeat: no-repeat;
 }
 
 mark.minimap-reading-match::after {
@@ -152,7 +166,7 @@ mark.minimap-reading-match::after {
   color: var(--minimap-counter-color, white);
   font-size: var(--minimap-counter-size, 9px);
   padding: var(--minimap-counter-padding, 0 2px);
-  border-radius: 2px;
+  border-radius: 4px;
   white-space: nowrap;
   z-index: 10000;
   pointer-events: none;
@@ -171,7 +185,7 @@ mark.minimap-reading-match::after {
   color: var(--minimap-counter-color, white);
   font-size: var(--minimap-counter-size, 9px);
   padding: var(--minimap-counter-padding, 0 2px);
-  border-radius: 2px;
+  border-radius: 4px;
   white-space: nowrap;
   z-index: 10000;
   pointer-events: none;
@@ -804,9 +818,15 @@ mark.minimap-reading-match::after {
 }
 
 mark.minimap-reading-match {
-  background: transparent;
-  border-bottom: 2px solid #ff6600;
-  padding-bottom: 1px;
+  margin: 0 -0.2em;
+  padding: 0 0.2em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: radial-gradient(farthest-side, #ff6600 98%, #0000) bottom left,
+              linear-gradient(#ff6600 0 0) bottom,
+              radial-gradient(farthest-side, #ff6600 98%, #0000) bottom right;
+  background-size: 8px 8px, calc(100% - 8px) 8px;
+  background-repeat: no-repeat;
 }
 
 /* Native scrollbar styling for source mode */
