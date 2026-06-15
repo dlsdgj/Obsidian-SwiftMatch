@@ -1,6 +1,19 @@
 # Changelog
 
-## 🆕 v1.3.4 (2026-06-15)
+## 🆕 v1.3.5 (2026-06-16)
+
+- **Open Document Jump Fix** — Full-text search instead of per-line search; suppress Remember Cursor Position plugin restore; scroll to vertical center
+- **Marshmallow Highlight** — Jump text highlighted with custom marshmallow style after opening document; click anywhere in editor to dismiss
+- **Snippet Expand Buttons** — Replaced "..." truncation markers with "+" buttons; click to incrementally expand context before/after
+- **Title Click Opens Document** — Clicking match list title now opens document in new tab; removed preview panel trigger
+- **Search Box in Match List** — Moved search input from floating toggle to match list header; auto-focus on open; instant search on input with debounce
+- **Independent Cache Storage** — Search caches and floating keyword data moved from list-data.json to separate cache/ and keywords/ directories
+- **Document Count Fix** — Exhaustive search now correctly updates document count and total matches in header after completion
+- **Middle-Click Delete Search** — Middle-click on recent search chip removes it from history
+- **CSS Lint Fixes** — Removed box-decoration-break and all !important declarations
+- **Placeholder Language Switch** — Search box placeholder updates immediately on language change
+
+## v1.3.4 (2026-06-15)
 
 - **Edit Panel Horizontal Layout** — Rearranged display text, font size, padding, and opacity fields into a flex row; added "Get more styles" link to GitHub Discussions
 - **Follow Mouse Offset** — Added pinIconFollowOffsetX/Y settings with live preview box; only visible in follow-mouse mode

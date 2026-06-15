@@ -32,6 +32,22 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog</summary>
 
 <details>
+<summary>v1.3.5 (2026-06-16)</summary>
+
+- **Open Document Jump Fix** — Full-text search instead of per-line search; suppress Remember Cursor Position plugin restore; scroll to vertical center
+- **Marshmallow Highlight** — Jump text highlighted with custom marshmallow style after opening document; click anywhere in editor to dismiss
+- **Snippet Expand Buttons** — Replaced "..." truncation markers with "+" buttons; click to incrementally expand context before/after
+- **Title Click Opens Document** — Clicking match list title now opens document in new tab; removed preview panel trigger
+- **Search Box in Match List** — Moved search input from floating toggle to match list header; auto-focus on open; instant search on input with debounce
+- **Independent Cache Storage** — Search caches and floating keyword data moved from list-data.json to separate cache/ and keywords/ directories
+- **Document Count Fix** — Exhaustive search now correctly updates document count and total matches in header after completion
+- **Middle-Click Delete Search** — Middle-click on recent search chip removes it from history
+- **CSS Lint Fixes** — Removed box-decoration-break and all !important declarations
+- **Placeholder Language Switch** — Search box placeholder updates immediately on language change
+
+</details>
+
+<details>
 <summary>v1.3.4 (2026-06-15)</summary>
 
 - **Edit Panel Horizontal Layout** — Rearranged display text, font size, padding, and opacity fields into a flex row; added "Get more styles" link to GitHub Discussions
@@ -125,6 +141,22 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.5 (2026-06-16)</summary>
+
+- **打开文档跳转修复** — 全文搜索替代逐行搜索；抑制 Remember Cursor Position 插件恢复光标；滚动到垂直居中
+- **棉花糖高亮样式** — 打开文档后用自定义棉花糖样式高亮跳转文本；点击编辑器任意位置移除高亮
+- **摘要扩展按钮** — 截断的"..."替换为"+"按钮，点击逐步扩展前后上下文
+- **标题点击打开文档** — 点击匹配窗口标题直接新标签页打开文档；移除预览窗口触发
+- **搜索框移至匹配窗口** — 搜索输入框从悬浮按钮移到匹配窗口顶部；自动聚焦；输入即时搜索（防抖）
+- **缓存独立存储** — 搜索缓存和悬浮关键词数据从 list-data.json 移到 cache/ 和 keywords/ 子目录
+- **文档数量修复** — 全库搜索完成后正确更新标题中的文档数和结果总数
+- **中键删除搜索** — 最近搜索关键词中键点击删除
+- **CSS 规范修复** — 移除 box-decoration-break 和所有 !important 声明
+- **搜索框语言切换** — 搜索框占位符随语言即时更新
+
+</details>
 
 <details>
 <summary>v1.3.4 (2026-06-15)</summary>

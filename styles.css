@@ -11,31 +11,31 @@
 }
 
 .minimap-container.collapsed {
-  width: var(--collapse-width) !important;
+  width: var(--collapse-width);
   cursor: pointer;
 }
 
 .minimap-container.collapsed:hover {
-  width: 100% !important;
+  width: 100%;
 }
 
 .minimap-container.collapsed .minimap-content,
 .minimap-container.collapsed .minimap-slider {
-  opacity: 0 !important;
+  opacity: 0;
 }
 
 .minimap-container.collapsed:hover .minimap-content,
 .minimap-container.collapsed:hover .minimap-slider {
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 .minimap-container.collapsed .minimap-highlight {
   opacity: 0.9;
-  width: 100% !important;
+  width: 100%;
 }
 
 .minimap-container.collapsed:hover .minimap-highlight {
-  width: 100% !important;
+  width: 100%;
 }
 
 .minimap-content {
@@ -102,7 +102,7 @@
 }
 
 .minimap-highlight:hover {
-  opacity: 1 !important;
+  opacity: 1;
   transform: scaleX(1.1);
   box-shadow: 0 0 4px rgba(255, 200, 0, 0.8);
 }
@@ -135,8 +135,6 @@
   position: relative;
   margin: 0 -0.2em;
   padding: 0 0.2em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
   background: radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom left,
               linear-gradient(var(--minimap-match-color, #ff6600) 0 0) bottom,
               radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom right;
@@ -148,8 +146,6 @@ mark.minimap-reading-match {
   position: relative;
   margin: 0 -0.2em;
   padding: 0 0.2em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
   background: radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom left,
               linear-gradient(var(--minimap-match-color, #ff6600) 0 0) bottom,
               radial-gradient(farthest-side, var(--minimap-match-color, #ff6600) 98%, #0000) bottom right;
@@ -173,7 +169,7 @@ mark.minimap-reading-match::after {
 }
 
 .minimap-hide-counter::after {
-  content: none !important;
+  content: none;
 }
 
 .minimap-editor-match::after {
@@ -464,7 +460,6 @@ mark.minimap-reading-match::after {
   background-color: var(--background-modifier-border-hover);
 }
 
-/* ===== Swift Match Group Style (Regex-Css-Highlighter 备注弹窗风格) ===== */
 .swift-match-group {
   padding: 4px 0;
 }
@@ -742,7 +737,7 @@ mark.minimap-reading-match::after {
 
 .minimap-match-list-indicator.current,
 .minimap-match-list-indicator.pinned {
-  display: block !important;
+  display: block;
 }
 
 .minimap-floating-toggle {
@@ -770,17 +765,17 @@ mark.minimap-reading-match::after {
 }
 
 .minimap-floating-toggle-btn {
-  padding: 16px 18px !important;
-  font-size: 15px !important;
-  background-color: var(--background-secondary) !important;
-  border: 1px solid var(--background-modifier-border) !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
-  transition: background-color 0.15s ease !important;
+  padding: 16px 18px;
+  font-size: 15px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .minimap-floating-toggle-btn:hover {
-  background-color: var(--background-modifier-hover) !important;
+  background-color: var(--background-modifier-hover);
 }
 
 .minimap-settings-section-title {
@@ -805,7 +800,6 @@ mark.minimap-reading-match::after {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
 }
 
-/* Hide status bar - show on hover */
 .status-bar.minimap-hide-statusbar {
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -820,8 +814,6 @@ mark.minimap-reading-match::after {
 mark.minimap-reading-match {
   margin: 0 -0.2em;
   padding: 0 0.2em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
   background: radial-gradient(farthest-side, #ff6600 98%, #0000) bottom left,
               linear-gradient(#ff6600 0 0) bottom,
               radial-gradient(farthest-side, #ff6600 98%, #0000) bottom right;
@@ -829,7 +821,6 @@ mark.minimap-reading-match {
   background-repeat: no-repeat;
 }
 
-/* Native scrollbar styling for source mode */
 .cm-scroller::-webkit-scrollbar {
   width: 10px;
 }
@@ -861,7 +852,6 @@ mark.minimap-reading-match {
   background: transparent;
 }
 
-/* Native scrollbar styling for reading mode */
 .markdown-reading-view::-webkit-scrollbar,
 .markdown-preview-view::-webkit-scrollbar {
   width: 10px;
@@ -899,17 +889,13 @@ mark.minimap-reading-match {
   background: transparent;
 }
 
-/* 临时高亮 - 打开文档跳转后使用 */
-.border-pulse-red {
-  border: 2px solid #ff0000;
-  border-radius: 3px;
-  padding: 1px 3px;
-  animation: borderPulseRed 2s ease-in-out infinite alternate;
-}
-
-@keyframes borderPulseRed {
-  from { border-color: #ff0000; box-shadow: 0 0 5px #ff0000; }
-  to { border-color: #ff6666; box-shadow: 0 0 15px #ff0000, 0 0 25px #ff0000; }
+.hl-marshmallow {
+  background: #fff;
+  color: #cc2e7a;
+  border: 2px solid #ff6eb4;
+  border-radius: 10px;
+  padding: 0.1em 0.6em;
+  box-shadow: 2px 2px 0 #ffaad9;
 }
 
 .minimap-match-list-resize-handle {
@@ -932,7 +918,6 @@ mark.minimap-reading-match {
 
 .minimap-floating-toggle-badge {
   position: absolute;
-/*   top: 50%;  */
   left: 50%;
   transform: translate(-50%, -50%);
   color: #ffffff;

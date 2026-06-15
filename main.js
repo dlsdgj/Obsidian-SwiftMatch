@@ -206,7 +206,9 @@ const I18N = {
     preview: '预览',
     confirm: '确认',
     cancel: '取消',
-    close: '关闭'
+    close: '关闭',
+    expandBefore: '展开前文',
+    expandAfter: '展开后文'
   },
   en: {
     settingsTitle: 'SwiftMatch Settings',
@@ -304,7 +306,9 @@ const I18N = {
     preview: 'Preview',
     confirm: 'Confirm',
     cancel: 'Cancel',
-    close: 'Close'
+    close: 'Close',
+    expandBefore: 'Expand before',
+    expandAfter: 'Expand after'
   }
 };
 
@@ -403,10 +407,10 @@ class MinimapPlugin extends Plugin {
     this._lastMouseY = 0;
     this._recentSearches = [];
     this._recentSearchCaches = {}; // { term: { fileMap, matchCount } }
-    this._recentSearchCachesData = []; // persisted form
+    this._recentSearchCachesData = []; // deprecated, kept for migration
     this._listScrollPositions = {}; // { term: scrollTop }
     this._floatingKeywordButtons = []; // [{ wrapper, term, fileMap, matchCount, position }]
-    this._floatingKeywordsData = []; // [{ term, position, fileMapData, matchCount }] persisted
+    this._floatingKeywordsData = []; // deprecated, kept for migration
     this._listTriggerElement = null; // element that triggered the list display (keyword btn or floating toggle)
   }
 
@@ -425,16 +429,14 @@ class MinimapPlugin extends Plugin {
     
     this.registerEvents();
     
-    setTimeout(() => {
+    setTimeout(async () => {
       this.setupMinimap();
 
       if (this.settings.floatingToggleVisible) {
         this.createFloatingToggle();
       }
-      // Restore floating keyword buttons
-      this._restoreFloatingKeywordButtons();
-      // Restore recent search caches
-      this._restoreRecentSearchCaches();
+      await this._restoreRecentSearchCaches();
+      await this._restoreFloatingKeywordButtons();
     }, 300);
   }
 
@@ -462,6 +464,8 @@ class MinimapPlugin extends Plugin {
   async loadListData() {
     const dataDir = this.app.vault.configDir || '.obsidian';
     this.listDataPath = `${dataDir}/plugins/swift-match/list-data.json`;
+    this.cacheDir = `${dataDir}/plugins/swift-match/cache`;
+    this.keywordDir = `${dataDir}/plugins/swift-match/keywords`;
     
     try {
       const adapter = this.app.vault.adapter;
@@ -476,12 +480,9 @@ class MinimapPlugin extends Plugin {
         this.previewSize = data.previewSize || { width: 600, height: 600 };
         this.matchListSize = data.matchListSize || { width: null, height: null };
         this.savedMatchLists = data.savedMatchLists || [];
-        this._floatingKeywordsData = data.floatingKeywords || [];
         this._matchListScrollTop = data.matchListScrollTop || 0;
         this._recentSearches = data.recentSearches || [];
-        this._recentSearchCachesData = data.recentSearchCaches || [];
         this._listScrollPositions = data.listScrollPositions || {};
-
       }
     } catch (e) {
       console.error('Failed to load list data:', e);
@@ -496,25 +497,88 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  _cacheKeyToFileName(term) {
+    return term.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
+  }
+
+  async saveSearchCache(term, fileMap, matchCount) {
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(this.cacheDir)) {
+      await adapter.mkdir(this.cacheDir);
+    }
+    const fileName = this._cacheKeyToFileName(term);
+    const filePath = `${this.cacheDir}/${fileName}.json`;
+    const fileMapData = Array.from(fileMap.entries()).map(([file, headings]) => ({
+      path: file.path,
+      basename: file.basename,
+      headings
+    }));
+    await adapter.write(filePath, JSON.stringify({ term, matchCount, fileMapData }, null, 2));
+  }
+
+  async loadSearchCache(term) {
+    const adapter = this.app.vault.adapter;
+    const fileName = this._cacheKeyToFileName(term);
+    const filePath = `${this.cacheDir}/${fileName}.json`;
+    if (!await adapter.exists(filePath)) return null;
+    try {
+      const content = await adapter.read(filePath);
+      const data = JSON.parse(content);
+      const fileMap = await this.deserializeFileMap(data.fileMapData || []);
+      return { fileMap, matchCount: data.matchCount || 0 };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async saveKeywordData(term, position, fileMap, matchCount) {
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(this.keywordDir)) {
+      await adapter.mkdir(this.keywordDir);
+    }
+    const fileName = this._cacheKeyToFileName(term);
+    const filePath = `${this.keywordDir}/${fileName}.json`;
+    const fileMapData = fileMap ? Array.from(fileMap.entries()).map(([file, headings]) => ({
+      path: file.path,
+      basename: file.basename,
+      headings
+    })) : [];
+    await adapter.write(filePath, JSON.stringify({ term, position, matchCount, fileMapData }, null, 2));
+  }
+
+  async loadAllKeywordData() {
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(this.keywordDir)) return [];
+    const result = [];
+    try {
+      const listed = await adapter.list(this.keywordDir);
+      const files = Array.isArray(listed) ? listed : (listed?.files || []);
+      for (const f of files) {
+        const filePath = f.startsWith(this.keywordDir) ? f : `${this.keywordDir}/${f}`;
+        if (!filePath.endsWith('.json')) continue;
+        try {
+          const content = await adapter.read(filePath);
+          result.push(JSON.parse(content));
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return result;
+  }
+
+  async deleteKeywordData(term) {
+    const adapter = this.app.vault.adapter;
+    const fileName = this._cacheKeyToFileName(term);
+    const filePath = `${this.keywordDir}/${fileName}.json`;
+    if (await adapter.exists(filePath)) {
+      await adapter.remove(filePath);
+    }
+  }
+
   async saveListData() {
     if (!this.listDataPath) return;
     
     try {
       const adapter = this.app.vault.adapter;
-      const recentSearchCachesData = [];
-      for (const [term, cache] of Object.entries(this._recentSearchCaches)) {
-        if (cache && cache.fileMap && cache.fileMap.size > 0) {
-          recentSearchCachesData.push({
-            term,
-            matchCount: cache.matchCount || 0,
-            fileMapData: Array.from(cache.fileMap.entries()).map(([file, headings]) => ({
-              path: file.path,
-              basename: file.basename,
-              headings
-            }))
-          });
-        }
-      }
       const data = {
         listPosition: this.listPosition,
         listFixedPosition: this.listFixedPosition,
@@ -524,14 +588,17 @@ class MinimapPlugin extends Plugin {
         previewSize: this.previewSize,
         matchListSize: this.matchListSize,
         savedMatchLists: this.savedMatchLists,
-
-        floatingKeywords: this._floatingKeywordsData || [],
         matchListScrollTop: this._matchListScrollTop || 0,
         recentSearches: this._recentSearches || [],
-        recentSearchCaches: recentSearchCachesData,
         listScrollPositions: this._listScrollPositions || {}
       };
       await adapter.write(this.listDataPath, JSON.stringify(data, null, 2));
+
+      for (const [term, cache] of Object.entries(this._recentSearchCaches)) {
+        if (cache && cache.fileMap && cache.fileMap.size > 0) {
+          await this.saveSearchCache(term, cache.fileMap, cache.matchCount || 0);
+        }
+      }
     } catch (e) {
       console.error('Failed to save list data:', e);
     }
@@ -1417,47 +1484,52 @@ class MinimapPlugin extends Plugin {
     this.floatingSearchBox.type = 'text';
     this.floatingSearchBox.placeholder = t('searchPlaceholder');
     this.floatingSearchBox.style.cssText = `
-      position: absolute;
-      ${isRightSide ? 'right' : 'left'}: 100%;
-      top: 0;
-      width: 0;
-      height: ${size}px;
-      border: none;
-      border-radius: ${size / 2}px;
+      width: 100%;
+      height: 28px;
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 4px;
       background: var(--background-secondary);
       color: var(--text-normal);
       font-size: 12px;
-      padding: 0;
+      padding: 0 8px;
       outline: none;
-      opacity: 0;
-      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      ${isRightSide ? 'margin-right: 4px;' : 'margin-left: 4px;'}
+      box-sizing: border-box;
     `;
     this.floatingSearchBox.addEventListener('mousedown', (e) => {
       e.stopPropagation();
     });
-    this.floatingSearchBox.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+    this.floatingSearchBox.addEventListener('input', () => {
+      if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+      this._searchDebounceTimer = setTimeout(() => {
         const query = this.floatingSearchBox.value.trim();
         if (query) {
           this.currentSelection = query;
-          this.highlightMatches();
+          this._exhaustiveSearchDone = false;
+          this._listUserDismissed = false;
+          this._keepListVisible = true;
+          this.showMatchList(query, 0);
+          this._keepListVisible = false;
+        }
+      }, 300);
+    });
+    this.floatingSearchBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+        const query = this.floatingSearchBox.value.trim();
+        if (query) {
+          this.currentSelection = query;
+          this._exhaustiveSearchDone = false;
+          this._listUserDismissed = false;
+          this._keepListVisible = true;
+          this.showMatchList(query, 0);
+          this._keepListVisible = false;
         }
       } else if (e.key === 'Escape') {
         this.floatingSearchBox.value = '';
         this.floatingSearchBox.blur();
-        this.collapseFloatingSearchBox();
       }
     });
-    this.floatingSearchBox.addEventListener('blur', () => {
-      setTimeout(() => {
-        if (this.floatingToggleWrapper && !this.floatingToggleWrapper.matches(':hover')) {
-          this.collapseFloatingSearchBox();
-        }
-      }, 100);
-    });
-    this.floatingToggleWrapper.appendChild(this.floatingSearchBox);
     
     // Toggle button - wrapper for background
     this.floatingToggle = document.createElement('div');
@@ -1517,7 +1589,7 @@ class MinimapPlugin extends Plugin {
     this.floatingToggleWrapper.addEventListener('mouseenter', () => {
       this.floatingToggle.style.opacity = '1';
       this.floatingToggleWrapper.style.zIndex = '100000';
-      this.expandFloatingSearchBox();
+
 
       this._floatingToggleHoverTimer = setTimeout(() => {
         this._listUserDismissed = false;
@@ -1556,7 +1628,7 @@ class MinimapPlugin extends Plugin {
       const op = this.settings.floatingToggleOpacity || 0.6;
       this.floatingToggle.style.opacity = op.toString();
       this.floatingToggleWrapper.style.zIndex = '99999';
-      this.collapseFloatingSearchBox();
+
 
       if (this._floatingToggleHoverTimer) {
         clearTimeout(this._floatingToggleHoverTimer);
@@ -2189,6 +2261,10 @@ class MinimapPlugin extends Plugin {
           this.renderMatchList(cached.fileMap, cached.matchCount, false);
           this._listShownFromHover = true;
           this.positionListNearElement(wrapper);
+        } else {
+          this._listTriggerElement = wrapper;
+          this.currentSelection = keyword;
+          this.highlightMatches();
         }
       }, 200);
     });
@@ -2572,28 +2648,46 @@ class MinimapPlugin extends Plugin {
         btnData.wrapper.parentNode.removeChild(btnData.wrapper);
       }
       this._floatingKeywordButtons.splice(idx, 1);
+      this.deleteKeywordData(keyword);
       this._updateFloatingKeywordsData();
     }
   }
 
-  _updateFloatingKeywordsData() {
-    this._floatingKeywordsData = this._floatingKeywordButtons.map(btn => ({
-      term: btn.term,
-      position: btn.position || { left: 50, top: 100 },
-      fileMapData: btn.fileMap ? Array.from(btn.fileMap.entries()).map(([file, headings]) => ({
-        path: file.path,
-        basename: file.basename,
-        headings
-      })) : [],
-      matchCount: btn.matchCount || 0
-    }));
-    this.saveListData();
+  async _updateFloatingKeywordsData() {
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(this.keywordDir)) {
+      await adapter.mkdir(this.keywordDir);
+    }
+    let existingFiles = [];
+    try {
+      const listed = await adapter.list(this.keywordDir);
+      existingFiles = Array.isArray(listed) ? listed : (listed?.files || []);
+    } catch (e) {}
+    const savedTerms = new Set();
+    for (const btn of this._floatingKeywordButtons) {
+      savedTerms.add(this._cacheKeyToFileName(btn.term));
+      await this.saveKeywordData(
+        btn.term,
+        btn.position || { left: 50, top: 100 },
+        btn.fileMap,
+        btn.matchCount || 0
+      );
+    }
+    for (const f of existingFiles) {
+      const filePath = f.startsWith(this.keywordDir) ? f : `${this.keywordDir}/${f}`;
+      if (!filePath.endsWith('.json')) continue;
+      const baseName = filePath.split('/').pop().replace('.json', '');
+      if (!savedTerms.has(baseName)) {
+        await adapter.remove(filePath).catch(() => {});
+      }
+    }
   }
 
   async _restoreFloatingKeywordButtons() {
-    if (!this._floatingKeywordsData || this._floatingKeywordsData.length === 0) return;
+    const allData = await this.loadAllKeywordData();
+    if (!allData || allData.length === 0) return;
     
-    for (const data of this._floatingKeywordsData) {
+    for (const data of allData) {
       try {
         let fileMap = null;
         if (data.fileMapData && data.fileMapData.length > 0) {
@@ -2601,16 +2695,16 @@ class MinimapPlugin extends Plugin {
         }
         
         if (fileMap && fileMap.size > 0) {
-          // Cache the restored results
           this._recentSearchCaches[data.term] = { fileMap, matchCount: data.matchCount || 0 };
           this.createFloatingKeywordButton(data.term, fileMap, data.matchCount || 0);
-          // Override position with saved position
-          const btnData = this._floatingKeywordButtons.find(b => b.term === data.term);
-          if (btnData && data.position) {
-            btnData.position = data.position;
-            btnData.wrapper.style.left = data.position.left + 'px';
-            btnData.wrapper.style.top = data.position.top + 'px';
-          }
+        } else {
+          this.createFloatingKeywordButton(data.term, new Map(), 0);
+        }
+        const btnData = this._floatingKeywordButtons.find(b => b.term === data.term);
+        if (btnData && data.position) {
+          btnData.position = data.position;
+          btnData.wrapper.style.left = data.position.left + 'px';
+          btnData.wrapper.style.top = data.position.top + 'px';
         }
       } catch (e) {
         console.error('Failed to restore floating keyword button:', data.term, e);
@@ -2619,19 +2713,26 @@ class MinimapPlugin extends Plugin {
   }
 
   async _restoreRecentSearchCaches() {
-    if (!this._recentSearchCachesData || this._recentSearchCachesData.length === 0) return;
-    for (const data of this._recentSearchCachesData) {
-      try {
-        if (data.fileMapData && data.fileMapData.length > 0) {
-          const fileMap = await this.deserializeFileMap(data.fileMapData);
-          if (fileMap && fileMap.size > 0) {
-            this._recentSearchCaches[data.term] = { fileMap, matchCount: data.matchCount || 0 };
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(this.cacheDir)) return;
+    try {
+      const listed = await adapter.list(this.cacheDir);
+      const files = Array.isArray(listed) ? listed : (listed?.files || []);
+      for (const f of files) {
+        const filePath = f.startsWith(this.cacheDir) ? f : `${this.cacheDir}/${f}`;
+        if (!filePath.endsWith('.json')) continue;
+        try {
+          const content = await adapter.read(filePath);
+          const data = JSON.parse(content);
+          if (data.fileMapData && data.fileMapData.length > 0) {
+            const fileMap = await this.deserializeFileMap(data.fileMapData);
+            if (fileMap && fileMap.size > 0) {
+              this._recentSearchCaches[data.term] = { fileMap, matchCount: data.matchCount || 0 };
+            }
           }
-        }
-      } catch (e) {
-        console.error('Failed to restore recent search cache:', data.term, e);
+        } catch (e) {}
       }
-    }
+    } catch (e) {}
   }
 
   positionListNearElement(el) {
@@ -2871,7 +2972,9 @@ class MinimapPlugin extends Plugin {
         const headerHeight = header ? header.offsetHeight : 36;
         const recentSection = this.matchList.querySelector('.minimap-match-list-recent');
         const recentHeight = recentSection ? recentSection.offsetHeight : 0;
-        const availableHeight = newHeight - headerHeight - recentHeight - 14;
+        const searchRow = this.matchList.querySelector('.minimap-floating-search-box')?.parentElement;
+        const searchRowHeight = searchRow ? searchRow.offsetHeight : 0;
+        const availableHeight = newHeight - headerHeight - recentHeight - 40;
         listContainer.style.maxHeight = `${Math.max(50, availableHeight)}px`;
       }
       
@@ -3316,8 +3419,9 @@ class MinimapPlugin extends Plugin {
         const direction = e.deltaY > 0 ? 1 : -1;
         scrollEl.scrollTop += direction * scrollAmount;
       } else {
-        const editor = this.getEditor();
-        if (!editor || !editor.cm) return;
+    const editor = this.getEditor();
+    console.log('[SwiftMatch] heading editor mode, editor:', editor, 'editor.cm:', editor?.cm);
+    if (!editor || !editor.cm) return;
         
         const cm = editor.cm;
         if (!cm.scrollDOM) return;
@@ -4391,13 +4495,16 @@ class MinimapPlugin extends Plugin {
                 const trimmed = lines[i].trim();
                 if (trimmed.length > 0) {
                   let snippet = trimmed;
+                  let fullLine = trimmed;
+                  let truncateStart = 0;
+                  let truncateEnd = trimmed.length;
                   if (snippet.length > 120) {
                     const matchIdx = snippet.toLowerCase().indexOf(searchLower);
-                    const start = Math.max(0, matchIdx - 30);
-                    const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
-                    snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+                    truncateStart = Math.max(0, matchIdx - 30);
+                    truncateEnd = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+                    snippet = snippet.slice(truncateStart, truncateEnd);
                   }
-                  snippets.push(snippet);
+                  snippets.push({ text: snippet, fullLine, truncateStart, truncateEnd });
                 }
               }
             }
@@ -4574,6 +4681,10 @@ class MinimapPlugin extends Plugin {
     this._listShownFromHover = true;
     this.positionListNearFloatingToggle();
 
+    if (this.floatingSearchBox) {
+      setTimeout(() => { this.floatingSearchBox.focus(); }, 50);
+    }
+
     // Add mouseleave handler
     if (!this._matchListHoverLeaveHandler) {
       this._matchListHoverLeaveHandler = () => {
@@ -4729,13 +4840,16 @@ class MinimapPlugin extends Plugin {
                 const trimmed = lines[i].trim();
                 if (trimmed.length > 0) {
                   let snippet = trimmed;
+                  let fullLine = trimmed;
+                  let truncateStart = 0;
+                  let truncateEnd = trimmed.length;
                   if (snippet.length > 120) {
                     const matchIdx = snippet.toLowerCase().indexOf(searchLower);
-                    const start = Math.max(0, matchIdx - 30);
-                    const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
-                    snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+                    truncateStart = Math.max(0, matchIdx - 30);
+                    truncateEnd = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+                    snippet = snippet.slice(truncateStart, truncateEnd);
                   }
-                  snippets.push(snippet);
+                  snippets.push({ text: snippet, fullLine, truncateStart, truncateEnd });
                 }
               }
             }
@@ -4759,9 +4873,13 @@ class MinimapPlugin extends Plugin {
     if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
       this._cachedMatchList = fileMap;
       this._cachedMatchListKey = cacheKey;
-      this._recentSearchCaches[searchText] = { fileMap, matchCount };
+      this._recentSearchCaches[searchText] = { fileMap, matchCount: totalAllDocMatches };
+      this._pendingMatchCount = totalAllDocMatches;
       
-      await this.saveMatchListData(searchText, fileMap, matchCount);
+      await this.saveMatchListData(searchText, fileMap, totalAllDocMatches);
+      if (this._isListVisible) {
+        this.renderMatchList(fileMap, totalAllDocMatches, false);
+      }
     }
 
     this._searchInProgress = false;
@@ -4838,15 +4956,17 @@ class MinimapPlugin extends Plugin {
         if (idx !== -1) {
           const trimmed = lines[i].trim();
           if (trimmed.length > 0) {
-            // Truncate long lines, showing context around the match
             let snippet = trimmed;
+            let fullLine = trimmed;
+            let truncateStart = 0;
+            let truncateEnd = trimmed.length;
             if (snippet.length > 120) {
               const matchIdx = snippet.toLowerCase().indexOf(searchLower);
-              const start = Math.max(0, matchIdx - 30);
-              const end = Math.min(snippet.length, matchIdx + searchLower.length + 70);
-              snippet = (start > 0 ? '...' : '') + snippet.slice(start, end) + (end < trimmed.length ? '...' : '');
+              truncateStart = Math.max(0, matchIdx - 30);
+              truncateEnd = Math.min(snippet.length, matchIdx + searchLower.length + 70);
+              snippet = snippet.slice(truncateStart, truncateEnd);
             }
-            snippets.push(snippet);
+            snippets.push({ text: snippet, fullLine, truncateStart, truncateEnd });
           }
         }
       }
@@ -4939,7 +5059,7 @@ class MinimapPlugin extends Plugin {
 
     // If list is already visible, refresh it
     if (this._isListVisible) {
-      this.renderMatchList(fileMap, matchCount, false);
+      this.renderMatchList(fileMap, totalAllDocMatches, false);
     }
   }
 
@@ -4961,9 +5081,7 @@ class MinimapPlugin extends Plugin {
       const listContainer = this.matchList.querySelector('.minimap-match-list-container');
       const savedScrollTop = listContainer ? listContainer.scrollTop : 0;
       this.matchList.innerHTML = '';
-      if (existingResizeHandle) {
-        this.matchList.appendChild(existingResizeHandle);
-      }
+
       // Store scroll position to restore after rebuild
       this._savedListScrollTop = savedScrollTop;
       
@@ -5008,6 +5126,16 @@ class MinimapPlugin extends Plugin {
       header.appendChild(saveBtn);
       
       this.matchList.appendChild(header);
+
+      // Search input at top of match list
+      if (this.floatingSearchBox) {
+        this.floatingSearchBox.placeholder = t('searchPlaceholder');
+      }
+      const searchRow = document.createElement('div');
+      searchRow.className = 'swift-match-search-row';
+      searchRow.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;';
+      searchRow.appendChild(this.floatingSearchBox);
+      this.matchList.appendChild(searchRow);
 
       // Recent searches section in header
       const recentSection = document.createElement('div');
@@ -5066,6 +5194,14 @@ class MinimapPlugin extends Plugin {
           if (e.target === chipPin) return;
           e.stopPropagation();
           this.isInteractingWithList = true;
+          if (e.button === 1) {
+            e.preventDefault();
+            const idx = this._recentSearches.indexOf(term);
+            if (idx >= 0) this._recentSearches.splice(idx, 1);
+            delete this._recentSearchCaches[term];
+            this.saveListData();
+            chip.remove();
+          }
         });
         chip.addEventListener('click', (e) => {
           if (e.target === chipPin) return;
@@ -5155,15 +5291,10 @@ class MinimapPlugin extends Plugin {
         e.stopPropagation();
         e.preventDefault();
         this.isInteractingWithList = true;
-        if (e.button === 1) {
+        if (e.button === 0 || e.button === 1) {
           this.closePreview();
           this.hideMatchList();
           this.openFileInNewTab(file, true);
-          setTimeout(() => {
-            if (searchText) this.jumpToSearchTextInEditor(searchText);
-          }, 500);
-        } else if (e.button === 0) {
-          this.showPreview(file);
         }
       });
       headerEl.appendChild(fileNameEl);
@@ -5178,8 +5309,12 @@ class MinimapPlugin extends Plugin {
         let matchEntries = [];
         if (item.type === 'content' && (item.snippet || (item.snippets && item.snippets.length > 0))) {
           const contentSnippets = item.snippets || (item.snippet ? [item.snippet] : []);
-          for (const snippetText of contentSnippets) {
-            matchEntries.push({ text: snippetText, isMarkdown: true, type: 'content' });
+          for (const snippetData of contentSnippets) {
+            if (typeof snippetData === 'object' && snippetData.text !== undefined) {
+              matchEntries.push({ text: snippetData.text, isMarkdown: true, type: 'content', snippetData });
+            } else {
+              matchEntries.push({ text: String(snippetData), isMarkdown: true, type: 'content', snippetData: null });
+            }
           }
         } else if (item.type === 'tag') {
           matchEntries.push({ text: `#${item.text}`, isMarkdown: false, type: 'tag' });
@@ -5212,12 +5347,65 @@ class MinimapPlugin extends Plugin {
           const itemBox = document.createElement('div');
           itemBox.style.cssText = 'flex:1;min-width:0;overflow:hidden;';
 
+          const snippetInfo = entry.snippetData;
+          const isTruncated = snippetInfo && typeof snippetInfo === 'object' && snippetInfo.fullLine && (snippetInfo.truncateStart > 0 || snippetInfo.truncateEnd < snippetInfo.fullLine.length);
+
+          const expandBtnStyle = 'display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--background-modifier-border);background:transparent;color:var(--text-muted);font-size:10px;cursor:pointer;vertical-align:middle;line-height:1;padding:0;margin:0 2px;flex-shrink:0;transition:background 0.15s,color 0.15s;';
+
           // 文本内容
           const textEl = document.createElement('div');
           textEl.className = 'swift-match-card-text';
           textEl.style.cssText = 'font-size:12px;overflow:hidden;cursor:text;user-select:text;';
 
-          if (entry.isMarkdown && entry.text) {
+          if (isTruncated) {
+            let currentStart = snippetInfo.truncateStart;
+            let currentEnd = snippetInfo.truncateEnd;
+
+            const renderSnippet = () => {
+              textEl.innerHTML = '';
+              if (currentStart > 0) {
+                const leftBtn = document.createElement('button');
+                leftBtn.textContent = '+';
+                leftBtn.style.cssText = expandBtnStyle;
+                leftBtn.title = t('expandBefore');
+                leftBtn.addEventListener('click', (ce) => {
+                  ce.preventDefault();
+                  ce.stopPropagation();
+                  currentStart = Math.max(0, currentStart - 30);
+                  renderSnippet();
+                });
+                textEl.appendChild(leftBtn);
+              }
+              const snippetSpan = document.createElement('span');
+              const snippetText = snippetInfo.fullLine.slice(currentStart, currentEnd);
+              MarkdownRenderer.renderMarkdown(
+                snippetText,
+                snippetSpan,
+                file.path,
+                this
+              ).then(() => {
+                const renderedContent = snippetSpan.querySelector('p');
+                if (renderedContent) {
+                  snippetSpan.innerHTML = renderedContent.innerHTML;
+                }
+              });
+              textEl.appendChild(snippetSpan);
+              if (currentEnd < snippetInfo.fullLine.length) {
+                const rightBtn = document.createElement('button');
+                rightBtn.textContent = '+';
+                rightBtn.style.cssText = expandBtnStyle;
+                rightBtn.title = t('expandAfter');
+                rightBtn.addEventListener('click', (ce) => {
+                  ce.preventDefault();
+                  ce.stopPropagation();
+                  currentEnd = Math.min(snippetInfo.fullLine.length, currentEnd + 30);
+                  renderSnippet();
+                });
+                textEl.appendChild(rightBtn);
+              }
+            };
+            renderSnippet();
+          } else if (entry.isMarkdown && entry.text) {
             MarkdownRenderer.renderMarkdown(
               entry.text,
               textEl,
@@ -5267,24 +5455,35 @@ class MinimapPlugin extends Plugin {
             this.closePreview();
             this.hideMatchList();
             const jumpSearchText = searchText;
+            console.log('[SwiftMatch] openDoc clicked', { file: file?.path, level: item.level, type: item.type, text: item.text, jumpSearchText });
             if (item.level > 0 && item.text) {
-              this.openFileInNewTabWithHeading(file, item.text, true);
+              const leaf = await this.openFileInNewTabWithHeading(file, item.text, true);
+              console.log('[SwiftMatch] openFileInNewTabWithHeading done, leaf:', leaf);
               setTimeout(() => {
-                this.currentSelection = jumpSearchText;
-                this.highlightMatches();
-              }, 1200);
+                console.log('[SwiftMatch] heading branch setTimeout fired');
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+              }, 2500);
             } else if (item.type === 'tag') {
-              this.openFileInNewTab(file, true);
-              setTimeout(() => { this.jumpToTagInEditor(item.text); }, 1200);
+              const leaf = await this.openFileInNewTab(file, true);
+              console.log('[SwiftMatch] openFileInNewTab done (tag), leaf:', leaf);
+              setTimeout(() => {
+                console.log('[SwiftMatch] tag branch setTimeout fired');
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+                this.jumpToTagInEditor(item.text);
+                this._releaseRememberCursor(file);
+              }, 2500);
             } else {
               const firstSentence = this.getFirstSentence(entry.text);
               const jumpText = firstSentence || searchText;
-              this.openFileInNewTab(file, true);
+              const leaf = await this.openFileInNewTab(file, true);
+              console.log('[SwiftMatch] openFileInNewTab done (else), leaf:', leaf, 'jumpText:', jumpText);
               setTimeout(() => {
-                this.currentSelection = jumpSearchText;
-                this.highlightMatches();
+                console.log('[SwiftMatch] else branch setTimeout fired, activeLeaf:', this.app.workspace.activeLeaf?.view?.file?.path);
+                console.log('[SwiftMatch] getEditor:', this.getEditor(), 'isReadingMode:', this.isReadingMode());
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 if (jumpText) this.jumpToSearchTextInEditor(jumpText);
-              }, 1200);
+                this._releaseRememberCursor(file);
+              }, 2500);
             }
           });
           openBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.isInteractingWithList = true; });
@@ -5306,6 +5505,10 @@ class MinimapPlugin extends Plugin {
     this.matchList.style.opacity = this.listOpacity;
     this._isListVisible = true;
 
+    if (this.floatingSearchBox) {
+      setTimeout(() => { this.floatingSearchBox.focus(); }, 50);
+    }
+
     // Apply saved match list size
     const savedWidth = this.matchListSize.width || this.settings.matchListWidth;
     const maxSavedHeight = this.matchListSize.height || this.settings.matchListHeight;
@@ -5319,12 +5522,13 @@ class MinimapPlugin extends Plugin {
       const headerHeight = sizeHeader ? sizeHeader.offsetHeight : 36;
       const recentSection = this.matchList.querySelector('.minimap-match-list-recent');
       const recentHeight = recentSection ? recentSection.offsetHeight : 0;
-      const containerMaxHeight = maxSavedHeight - headerHeight - recentHeight - 14;
+      const searchRow = this.matchList.querySelector('.minimap-floating-search-box')?.parentElement;
+      const searchRowHeight = searchRow ? searchRow.offsetHeight : 0;
+      const containerMaxHeight = maxSavedHeight - headerHeight - recentHeight - 40;
       sizeListContainer.style.maxHeight = `${Math.max(50, containerMaxHeight)}px`;
-      // Auto-adjust list height: fit content but not exceed maxSavedHeight
       requestAnimationFrame(() => {
         const contentHeight = sizeListContainer.scrollHeight;
-        const autoHeight = Math.min(contentHeight + headerHeight + recentHeight + 14, maxSavedHeight);
+        const autoHeight = Math.min(contentHeight + headerHeight + recentHeight + 40, maxSavedHeight);
         this.matchList.style.height = `${autoHeight}px`;
         const termScrollPos = searchText ? (this._listScrollPositions[searchText] || 0) : 0;
         const scrollTopToRestore = this._savedListScrollTop || termScrollPos || this._matchListScrollTop;
@@ -5394,18 +5598,41 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  _suppressRememberCursor(file) {
+    const rcp = this.app.plugins.plugins['obsidian-remember-cursor-position'];
+    if (rcp && rcp.loadingFile !== undefined) {
+      rcp.loadingFile = true;
+      if (file) rcp.lastLoadedFileName = file.path;
+    }
+  }
+
+  _releaseRememberCursor(file) {
+    const rcp = this.app.plugins.plugins['obsidian-remember-cursor-position'];
+    if (rcp && rcp.loadingFile !== undefined) {
+      if (file) {
+        const st = rcp.db[file.path];
+        if (st) rcp.lastEphemeralState = st;
+      }
+      rcp.loadingFile = false;
+    }
+  }
+
   async openFileInNewTabWithHeading(file, heading, setActive = true) {
+    this._suppressRememberCursor(file);
     const currentLeaf = this.app.workspace.activeLeaf;
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.openFile(file, { setActive });
     
     setTimeout(() => {
+      this.app.workspace.setActiveLeaf(leaf, { focus: true });
       this.jumpToHeadingInEditor(heading);
-    }, 500);
+      this._releaseRememberCursor(file);
+    }, 2500);
     
     if (!setActive && currentLeaf) {
       this.app.workspace.setActiveLeaf(currentLeaf, { focus: true });
     }
+    return leaf;
   }
 
   async showPreviewWithHeading(file, heading) {
@@ -5605,8 +5832,10 @@ class MinimapPlugin extends Plugin {
   }
 
   jumpToHeadingInEditor(heading) {
+    console.log('[SwiftMatch] jumpToHeadingInEditor called, heading:', heading, 'isReadingMode:', this.isReadingMode());
     if (this.isReadingMode()) {
       const readingEl = this.getReadingViewContentEl();
+      console.log('[SwiftMatch] heading reading mode, readingEl:', readingEl);
       if (!readingEl) return;
       const headingText = heading.toLowerCase().trim();
       const elements = readingEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -5862,8 +6091,10 @@ class MinimapPlugin extends Plugin {
   }
 
   async openFileInNewTab(file, setActive = true) {
+    this._suppressRememberCursor(file);
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.openFile(file, { setActive });
+    return leaf;
   }
 
   // 从文本中提取第一句话（支持中英文句号、感叹号、问号、换行）
@@ -5887,33 +6118,84 @@ class MinimapPlugin extends Plugin {
     });
   }
 
-  // 编辑模式：用 border-pulse-red 临时高亮跳转文本
+  // 编辑模式：直接向 matchHighlightField 添加棉花糖装饰
   highlightJumpText(cm, from, to) {
     if (!cm) return;
-    const deco = Decoration.mark({
-      class: 'border-pulse-red'
+    this._ensureEditorFields(cm);
+    const existing = cm.state.field(matchHighlightField, false) || Decoration.none;
+    const marshmallowDeco = Decoration.mark({
+      class: 'minimap-editor-match hl-marshmallow',
+      attributes: {
+        'style': `background:#fff !important;color:#cc2e7a !important;border:2px solid #ff6eb4 !important;border-radius:10px !important;padding:0.1em 0.6em !important;box-shadow:2px 2px 0 #ffaad9 !important;margin:0 -0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`
+      }
     });
-    const decorationSet = Decoration.set([{ from, to, value: deco }]);
+    const newSet = existing.update({
+      add: [{ from, to, value: marshmallowDeco }]
+    });
     cm.dispatch({
-      effects: setJumpHighlight.of(decorationSet)
+      effects: setMatchHighlights.of(newSet)
     });
-    // 3秒后自动移除高亮
-    setTimeout(() => {
-      this.clearJumpHighlight(cm);
-    }, 3000);
+    this._jumpHighlightRange = { from, to };
+    this._setupMarshmallowDismiss(cm);
   }
 
-  // 阅读模式：用 span.border-pulse-red 包裹跳转文本
+  _setupMarshmallowDismiss(cm) {
+    if (this._marshmallowDismissHandler) {
+      cm.dom.removeEventListener('mousedown', this._marshmallowDismissHandler);
+    }
+    this._marshmallowDismissHandler = () => {
+      this._jumpHighlightRange = null;
+      this._removeMarshmallowDeco(cm);
+      cm.dom.removeEventListener('mousedown', this._marshmallowDismissHandler);
+      this._marshmallowDismissHandler = null;
+    };
+    cm.dom.addEventListener('mousedown', this._marshmallowDismissHandler);
+  }
+
+  _removeMarshmallowDeco(cm) {
+    if (!cm) return;
+    const current = cm.state.field(matchHighlightField, false);
+    if (current) {
+      const filtered = current.update({
+        filter: (f, t, v) => {
+          const spec = v.spec;
+          return !(spec && spec.class && spec.class.includes('hl-marshmallow'));
+        }
+      });
+      cm.dispatch({
+        effects: setMatchHighlights.of(filtered)
+      });
+    }
+  }
+
+  _ensureEditorFields(cm) {
+    if (!cm) return;
+    const matchField = cm.state.field(matchHighlightField, false);
+    if (matchField === undefined) {
+      cm.dispatch({
+        effects: StateEffect.appendConfig.of([matchHighlightField])
+      });
+    }
+    const jumpField = cm.state.field(jumpHighlightField, false);
+    if (jumpField === undefined) {
+      cm.dispatch({
+        effects: StateEffect.appendConfig.of([jumpHighlightField])
+      });
+    }
+  }
+
+  // 阅读模式：用 span.hl-marshmallow 包裹跳转文本
   highlightJumpTextReading(container, textNode, offset, length) {
     const parent = textNode.parentNode;
-    if (!parent || parent.closest('.border-pulse-red')) return;
+    if (!parent || parent.closest('.hl-marshmallow')) return;
 
     const range = document.createRange();
     range.setStart(textNode, offset);
     range.setEnd(textNode, offset + length);
 
     const span = document.createElement('span');
-    span.className = 'border-pulse-red';
+    span.className = 'hl-marshmallow';
+    span.style.cssText = 'background:#fff !important;color:#cc2e7a !important;border:2px solid #ff6eb4 !important;border-radius:10px !important;padding:0.1em 0.6em !important;box-shadow:2px 2px 0 #ffaad9 !important;';
     range.surroundContents(span);
 
     // 3秒后自动移除
@@ -5928,8 +6210,10 @@ class MinimapPlugin extends Plugin {
   }
 
   jumpToSearchTextInEditor(searchText) {
+    console.log('[SwiftMatch] jumpToSearchTextInEditor called, searchText:', searchText, 'isReadingMode:', this.isReadingMode());
     if (this.isReadingMode()) {
       const readingEl = this.getReadingViewContentEl();
+      console.log('[SwiftMatch] reading mode, readingEl:', readingEl);
       if (!readingEl) return;
       const searchLower = searchText.toLowerCase();
       const walker = document.createTreeWalker(readingEl, NodeFilter.SHOW_TEXT, null, false);
@@ -5942,8 +6226,9 @@ class MinimapPlugin extends Plugin {
           range.setEnd(node, idx + searchText.length);
           range.scrollIntoView({ behavior: 'auto', block: 'center' });
 
-          // 临时高亮 border-pulse-red
+          // 临时高亮 hl-marshmallow
           this.highlightJumpTextReading(readingEl, node, idx, searchText.length);
+          console.log('[SwiftMatch] reading mode: found and scrolled to text');
           break;
         }
       }
@@ -5951,29 +6236,63 @@ class MinimapPlugin extends Plugin {
     }
 
     const editor = this.getEditor();
+    console.log('[SwiftMatch] editor mode, editor:', editor, 'editor.cm:', editor?.cm);
     if (!editor || !editor.cm) return;
 
     const cm = editor.cm;
     const content = editor.getValue();
     const searchLower = searchText.toLowerCase();
-    const lines = content.split('\n');
 
-    for (let i = 0; i < lines.length; i++) {
-      const pos = lines[i].toLowerCase().indexOf(searchLower);
-      if (pos !== -1) {
-        const lineNum = i + 1;
-        const lineObj = cm.state.doc.line(lineNum);
-        const from = lineObj.from + pos;
-        const to = from + lines[i].slice(pos, pos + searchText.length).length;
+    const fullIdx = content.toLowerCase().indexOf(searchLower);
+    console.log('[SwiftMatch] fullText search, fullIdx:', fullIdx);
+    if (fullIdx !== -1) {
+      const from = fullIdx;
+      const to = fullIdx + searchText.length;
+      console.log('[SwiftMatch] editor mode: found at pos', from, 'to', to);
 
+      cm.dispatch({
+        selection: { anchor: from },
+        scrollIntoView: { range: { from, to } }
+      });
+
+      setTimeout(() => {
+        const coords = cm.coordsAtPos(from);
+        const scrollEl = cm.scrollDOM;
+        if (coords && scrollEl) {
+          const visibleHeight = scrollEl.clientHeight;
+          const targetY = coords.top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop - visibleHeight * 0.35;
+          scrollEl.scrollTop = targetY;
+        }
+      }, 50);
+
+      this.highlightJumpText(cm, from, to);
+      return;
+    }
+
+    console.log('[SwiftMatch] fullText not found, trying fallback with jumpSearchText');
+    const fallbackText = this.currentSelection;
+    if (fallbackText && fallbackText !== searchText) {
+      const fallbackIdx = content.toLowerCase().indexOf(fallbackText.toLowerCase());
+      console.log('[SwiftMatch] fallback search for:', fallbackText, 'idx:', fallbackIdx);
+      if (fallbackIdx !== -1) {
+        const from = fallbackIdx;
+        const to = fallbackIdx + fallbackText.length;
         cm.dispatch({
-          selection: { anchor: from, head: to },
+          selection: { anchor: from },
           scrollIntoView: { range: { from, to } }
         });
 
-        // 临时高亮 border-pulse-red
+        setTimeout(() => {
+          const coords = cm.coordsAtPos(from);
+          const scrollEl = cm.scrollDOM;
+          if (coords && scrollEl) {
+            const visibleHeight = scrollEl.clientHeight;
+            const targetY = coords.top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop - visibleHeight * 0.35;
+            scrollEl.scrollTop = targetY;
+          }
+        }, 50);
+
         this.highlightJumpText(cm, from, to);
-        break;
       }
     }
   }
@@ -6887,19 +7206,50 @@ class MinimapPlugin extends Plugin {
           const to = from + this.currentSelection.length;
           const label = `${match.index}/${totalMatches}`;
 
-          allDecorations.push({
-            from: from,
-            to: to,
-            value: Decoration.mark({
-              class: 'minimap-editor-match',
-              attributes: {
-                'data-match': label,
-                'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(currentBorderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${currentCounterBgColor};--minimap-counter-color: ${currentCounterColor};`
-              }
-            })
-          });
+          const isJumpTarget = this._jumpHighlightRange && from === this._jumpHighlightRange.from && to === this._jumpHighlightRange.to;
+
+          if (isJumpTarget) {
+            allDecorations.push({
+              from: from,
+              to: to,
+              value: Decoration.mark({
+                class: 'minimap-editor-match hl-marshmallow',
+                attributes: {
+                  'data-match': label,
+                  'style': `background:#fff !important;color:#cc2e7a !important;border:2px solid #ff6eb4 !important;border-radius:10px !important;padding:0.1em 0.6em !important;box-shadow:2px 2px 0 #ffaad9 !important;margin:0 -0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;--minimap-counter-bgcolor:#ff6eb4;--minimap-counter-color:#fff;`
+                }
+              })
+            });
+          } else {
+            allDecorations.push({
+              from: from,
+              to: to,
+              value: Decoration.mark({
+                class: 'minimap-editor-match',
+                attributes: {
+                  'data-match': label,
+                  'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(currentBorderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${currentCounterBgColor};--minimap-counter-color: ${currentCounterColor};`
+                }
+              })
+            });
+          }
         } catch (e) {}
       }
+    }
+
+    if (this._jumpHighlightRange) {
+      const jFrom = this._jumpHighlightRange.from;
+      const jTo = this._jumpHighlightRange.to;
+      allDecorations.push({
+        from: jFrom,
+        to: jTo,
+        value: Decoration.mark({
+          class: 'minimap-editor-match hl-marshmallow',
+          attributes: {
+            'style': `background:#fff !important;color:#cc2e7a !important;border:2px solid #ff6eb4 !important;border-radius:10px !important;padding:0.1em 0.6em !important;box-shadow:2px 2px 0 #ffaad9 !important;margin:0 -0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`
+          }
+        })
+      });
     }
 
     if (allDecorations.length > 0) {
