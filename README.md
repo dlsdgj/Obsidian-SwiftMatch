@@ -58,6 +58,21 @@ An Obsidian plugin for quick text search and highlight across your vault. Select
 <summary>Changelog</summary>
 
 <details>
+<summary>v1.3.3 (2026-06-15)</summary>
+
+- **Floating Toggle Context Menu** — Right-click the floating toggle to show options: Edit, Hide, Settings
+- **Floating Toggle Edit Panel** — Edit display text, font size, padding, opacity, CSS class name, and custom CSS with live preview; custom styles override default inline styles for full appearance control
+- **Keyword Button Context Menu** — Right-click keyword buttons to show options: Edit, Close
+- **Keyword Button Edit Panel** — Edit display text, CSS class name, and custom CSS with live preview; styles are persisted per keyword
+- **Language Switch Fix** — Fixed null.style error when switching language in settings panel; language switch now reopens the panel instead of reloading the plugin
+- **Language Button Style** — Changed from button to clickable text; removed border, padding, and background
+- **Follow Mouse Mode Fix** — Fixed pin icon constantly following the cursor making it unclickable; now shows at cursor position once and stays fixed
+- **Z-Index Fix** — Hovered floating button now raises z-index to cover other buttons, preventing accidental clicks
+- **Title Cleanup** — Removed (helloworld) from settings panel title
+
+</details>
+
+<details>
 <summary>v1.3.0 (2026-06-13)</summary>
 
 - **i18n Support** — Added CN/EN language switch button in settings panel header; all UI text fully internationalized
@@ -149,6 +164,21 @@ An Obsidian plugin for quick text search and highlight across your vault. Select
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.3 (2026-06-15)</summary>
+
+- **悬浮球右键菜单** — 右键点击悬浮球弹出选项：编辑、隐藏、设置
+- **悬浮球编辑面板** — 可编辑显示文字、字体大小、内边距、透明度、CSS类名和自定义CSS，支持实时预览；自定义样式时移除默认内联样式，完全控制外观
+- **搜索词按钮右键菜单** — 右键点击搜索词按钮弹出选项：编辑、关闭
+- **搜索词按钮编辑面板** — 可编辑显示文字、CSS类名和自定义CSS，支持实时预览；样式按关键词持久化保存
+- **语言切换修复** — 修复设置面板切换语言时的 null.style 错误；语言切换改为重新打开面板而非重载插件
+- **语言按钮样式** — 从按钮改为可点击文本；移除边框、内边距和背景
+- **跟随鼠标模式修复** — 修复固定图标一直跟随鼠标导致无法点击的问题；现在只在光标位置显示一次然后固定
+- **Z-Index修复** — 悬浮按钮hover时提升z-index盖住其他按钮，避免误触
+- **标题清理** — 移除设置面板标题中的(helloworld)
+
+</details>
 
 <details>
 <summary>v1.3.0 (2026-06-13)</summary>

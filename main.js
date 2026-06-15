@@ -100,6 +100,9 @@ const DEFAULT_SETTINGS = {
   floatingToggleFontSize: 11,
   floatingTogglePaddingH: 10,
   floatingTogglePaddingV: 2,
+  floatingToggleStyleClass: '',
+  floatingToggleCustomStyle: '',
+  keywordButtonStyles: {},
   searchWordCountMin: 0,
   searchWordCountMax: 0,
   language: 'zh'
@@ -180,7 +183,26 @@ const I18N = {
     openDoc: '打开文档',
     exported: (f) => `已导出: ${f}`,
     exportFailed: (e) => `导出失败: ${e}`,
-    sourceNotFound: (f) => `找不到源文档: ${f}`
+    sourceNotFound: (f) => `找不到源文档: ${f}`,
+    editFloating: '编辑',
+    hideFloating: '隐藏',
+    closeKeyword: '关闭',
+    settings: '设置',
+    editTitle: '编辑悬浮球',
+    toggleText: '显示文字',
+    toggleFontSize: '字体大小',
+    togglePaddingH: '水平内边距',
+    togglePaddingV: '垂直内边距',
+    toggleOpacity: '透明度',
+    toggleSize: '按钮大小',
+    styleClass: '样式类名',
+    customStyle: '自定义样式',
+    getMoreStyles: '(获取更多样式)',
+    styleHint: '支持完整CSS格式，含伪元素。类名会自动作用域化。',
+    preview: '预览',
+    confirm: '确认',
+    cancel: '取消',
+    close: '关闭'
   },
   en: {
     settingsTitle: 'SwiftMatch Settings',
@@ -256,7 +278,26 @@ const I18N = {
     openDoc: 'Open Document',
     exported: (f) => `Exported: ${f}`,
     exportFailed: (e) => `Export failed: ${e}`,
-    sourceNotFound: (f) => `Source not found: ${f}`
+    sourceNotFound: (f) => `Source not found: ${f}`,
+    editFloating: 'Edit',
+    hideFloating: 'Hide',
+    closeKeyword: 'Close',
+    settings: 'Settings',
+    editTitle: 'Edit Floating Toggle',
+    toggleText: 'Display Text',
+    toggleFontSize: 'Font Size',
+    togglePaddingH: 'Horizontal Padding',
+    togglePaddingV: 'Vertical Padding',
+    toggleOpacity: 'Opacity',
+    toggleSize: 'Button Size',
+    styleClass: 'Style Class',
+    customStyle: 'Custom Style',
+    getMoreStyles: '(Get More Styles)',
+    styleHint: 'Supports full CSS format including pseudo-elements. Class names are auto-scoped.',
+    preview: 'Preview',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    close: 'Close'
   }
 };
 
@@ -351,7 +392,6 @@ class MinimapPlugin extends Plugin {
     this._readingViewObserver = null;
     this._readingHighlightRetryTimer = null;
     this._pinIcon = null;
-    this._pinIconFollowHandler = null;
     this._lastMouseX = 0;
     this._lastMouseY = 0;
     this._recentSearches = [];
@@ -630,7 +670,7 @@ class MinimapPlugin extends Plugin {
     this.settingsPanel.innerHTML = `
       <div class="minimap-settings-header">
         <div style="display:flex;align-items:center;gap:8px;">
-          <button id="minimap-lang-toggle" style="display:inline-block;padding:1px 8px;border-radius:3px;font-size:12px;font-weight:500;border:none;cursor:pointer;user-select:none;line-height:1;${this.settings.language === 'zh' ? 'background:#D85A30;' : 'background:#185FA5;'}color:#fff;letter-spacing:${this.settings.language === 'zh' ? '.1em' : '.08em'};">${this.settings.language === 'zh' ? 'CN' : 'EN'}</button>
+          <span id="minimap-lang-toggle" style="cursor:pointer;user-select:none;font-size:10px;font-weight:600;${this.settings.language === 'zh' ? 'color:#D85A30;' : 'color:#185FA5;'}letter-spacing:${this.settings.language === 'zh' ? '.1em' : '.08em'};">${this.settings.language === 'zh' ? 'CN' : 'EN'}</span>
           <span>${t('settingsTitle')} v${this.manifest.version || '1.0.0'}</span>
         </div>
         <button class="minimap-settings-close">×</button>
@@ -813,6 +853,7 @@ class MinimapPlugin extends Plugin {
     
     // Save panel width on resize
     const resizeObserver = new ResizeObserver(() => {
+      if (!this.settingsPanel) return;
       const width = this.settingsPanel.getBoundingClientRect().width;
       localStorage.setItem('minimap-settings-panel-width', `${width}px`);
     });
@@ -835,6 +876,7 @@ class MinimapPlugin extends Plugin {
     header.addEventListener('mousedown', (e) => {
       if (e.target.classList.contains('minimap-settings-close')) return;
       if (e.target.id === 'minimap-lang-toggle') return;
+      if (!this.settingsPanel) return;
       isDraggingPanel = true;
       dragOffsetX = e.clientX - this.settingsPanel.getBoundingClientRect().left;
       dragOffsetY = e.clientY - this.settingsPanel.getBoundingClientRect().top;
@@ -844,6 +886,7 @@ class MinimapPlugin extends Plugin {
     
     const onPanelMouseMove = (e) => {
       if (!isDraggingPanel) return;
+      if (!this.settingsPanel) return;
       const newLeft = e.clientX - dragOffsetX;
       const newTop = e.clientY - dragOffsetY;
       this.settingsPanel.style.left = `${newLeft}px`;
@@ -869,13 +912,18 @@ class MinimapPlugin extends Plugin {
     
     const langToggle = this.settingsPanel.querySelector('#minimap-lang-toggle');
     if (langToggle) {
-      langToggle.addEventListener('click', (e) => {
+      langToggle.addEventListener('click', async (e) => {
         e.stopPropagation();
+        e.preventDefault();
         this.settings.language = this.settings.language === 'zh' ? 'en' : 'zh';
         window._swiftMatchLang = this.settings.language;
         this.saveSettings();
+        // Close and reopen settings panel to apply language change
         this.closeSettingsPanel();
-        this.showSettingsPanel({ clientX: parseInt(this.settingsPanel.style.left) || 100, clientY: parseInt(this.settingsPanel.style.top) || 100, preventDefault: () => {}, stopPropagation: () => {} });
+        setTimeout(() => {
+          const mockEvent = { preventDefault: () => {}, stopPropagation: () => {} };
+          this.showSettingsPanel(mockEvent);
+        }, 100);
       });
     }
     
@@ -885,6 +933,7 @@ class MinimapPlugin extends Plugin {
     
     this.settingsPanel.querySelectorAll('.minimap-settings-tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        if (!this.settingsPanel) return;
         this.settingsPanel.querySelectorAll('.minimap-settings-tab').forEach(t => t.classList.remove('active'));
         this.settingsPanel.querySelectorAll('.minimap-settings-tab-content').forEach(c => c.classList.remove('active'));
         tab.classList.add('active');
@@ -913,6 +962,7 @@ class MinimapPlugin extends Plugin {
     });
 
     this.boundOutsideClick = (e) => {
+      if (!this.settingsPanel) return;
       if (!this.settingsPanel.contains(e.target)) {
         updateSettings();
         this.closeSettingsPanel();
@@ -1386,6 +1436,7 @@ class MinimapPlugin extends Plugin {
       white-space: nowrap;
       line-height: 1;
       padding: 0;
+      pointer-events: none;
       ${!this.settings.enableSelectionMatch ? 'text-decoration: line-through; text-decoration-color: rgba(240, 100, 120, 0.7);' : ''}
     `;
     this.floatingToggleText.textContent = toggleText;
@@ -1406,6 +1457,7 @@ class MinimapPlugin extends Plugin {
 
     this.floatingToggleWrapper.addEventListener('mouseenter', () => {
       this.floatingToggle.style.opacity = '1';
+      this.floatingToggleWrapper.style.zIndex = '100000';
       this.expandFloatingSearchBox();
 
       this._floatingToggleHoverTimer = setTimeout(() => {
@@ -1444,6 +1496,7 @@ class MinimapPlugin extends Plugin {
     this.floatingToggleWrapper.addEventListener('mouseleave', () => {
       const op = this.settings.floatingToggleOpacity || 0.6;
       this.floatingToggle.style.opacity = op.toString();
+      this.floatingToggleWrapper.style.zIndex = '99999';
       this.collapseFloatingSearchBox();
 
       if (this._floatingToggleHoverTimer) {
@@ -1522,10 +1575,8 @@ class MinimapPlugin extends Plugin {
           this.updateFloatingToggleStyle();
           if (this.currentSelection) {
             if (this.settings.enableSelectionMatch) {
-              // Re-enable: re-run highlights which will trigger showMatchList
               this.highlightMatches();
             } else {
-              // Disable: only clear cross-file search results, keep in-doc highlights
               this.hideMatchList();
               this.updateFloatingToggleBadge(0, 0);
             }
@@ -1557,13 +1608,7 @@ class MinimapPlugin extends Plugin {
     this.floatingToggle.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const mockEvent = {
-        clientX: e.clientX,
-        clientY: e.clientY,
-        preventDefault: () => {},
-        stopPropagation: () => {}
-      };
-      this.showSettingsPanel(mockEvent);
+      this.showFloatingContextMenu(e.clientX, e.clientY);
     });
 
     this.floatingToggle.addEventListener('wheel', (e) => {
@@ -1613,33 +1658,380 @@ class MinimapPlugin extends Plugin {
     const toggleText = this.settings.floatingToggleText || 'Swift';
     textEl.textContent = toggleText;
 
-    // Apply font size, padding from settings
-    const fontSize = this.settings.floatingToggleFontSize || 11;
-    const paddingH = this.settings.floatingTogglePaddingH ?? 10;
-    const paddingV = this.settings.floatingTogglePaddingV ?? 2;
-    const opacity = this.settings.floatingToggleOpacity ?? 0.6;
+    const hasCustomStyle = !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
 
-    textEl.style.fontSize = `${fontSize}px`;
-    this.floatingToggle.style.padding = `${paddingV}px ${paddingH}px`;
-    this.floatingToggle.style.opacity = opacity.toString();
-    
-    if (!this.settings.enableSelectionMatch) {
-      textEl.style.textDecoration = 'line-through';
-      textEl.style.textDecorationColor = 'rgba(240, 100, 120, 0.7)';
+    if (hasCustomStyle) {
+      // When custom style is applied, remove inline styles so CSS classes take full control
+      const fontSize = this.settings.floatingToggleFontSize || 11;
+      const opacity = this.settings.floatingToggleOpacity ?? 0.6;
+
+      // Reset toggle inline styles to minimal, let CSS classes control appearance
+      this.floatingToggle.style.cssText = `
+        position: relative;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        flex-shrink: 0;
+        opacity: ${opacity};
+        transition: transform 0.15s ease, opacity 0.2s ease;
+      `;
+
+      // Reset text inline styles, let CSS classes control appearance
+      textEl.style.cssText = `
+        font-size: ${fontSize}px;
+        white-space: nowrap;
+        line-height: 1;
+        padding: 0;
+        pointer-events: none;
+        ${!this.settings.enableSelectionMatch ? 'text-decoration: line-through; text-decoration-color: rgba(240, 100, 120, 0.7);' : ''}
+      `;
     } else {
-      textEl.style.textDecoration = 'none';
-      textEl.style.textDecorationColor = '';
+      // Default styles when no custom style is applied
+      const fontSize = this.settings.floatingToggleFontSize || 11;
+      const paddingH = this.settings.floatingTogglePaddingH ?? 10;
+      const paddingV = this.settings.floatingTogglePaddingV ?? 2;
+      const opacity = this.settings.floatingToggleOpacity ?? 0.6;
+
+      this.floatingToggle.style.cssText = `
+        position: relative;
+        padding: ${paddingV}px ${paddingH}px;
+        border-radius: 9999px;
+        background-color: rgba(240, 100, 120, 0.08);
+        box-shadow: inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        flex-shrink: 0;
+        opacity: ${opacity};
+        transition: transform 0.15s ease, opacity 0.2s ease;
+      `;
+
+      textEl.style.cssText = `
+        font-weight: 800;
+        background: linear-gradient(135deg, #f2709c, #ff9472, #f5af19, #f2709c);
+        background-size: 250% 100%;
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 6px rgba(240, 100, 120, 0.7)) drop-shadow(0 0 12px rgba(245, 150, 50, 0.5));
+        animation: hp-twilight-move 3.5s linear infinite;
+        font-size: ${fontSize}px;
+        white-space: nowrap;
+        line-height: 1;
+        padding: 0;
+        pointer-events: none;
+        ${!this.settings.enableSelectionMatch ? 'text-decoration: line-through; text-decoration-color: rgba(240, 100, 120, 0.7);' : ''}
+      `;
+    }
+
+    // Apply style class
+    const styleClass = this.settings.floatingToggleStyleClass || '';
+    // Remove previous style classes
+    this.floatingToggle.className = this.floatingToggle.className
+      .split(' ')
+      .filter(c => !c.startsWith('swift-match-floating-style-'))
+      .join(' ')
+      .trim();
+    if (styleClass) {
+      this.floatingToggle.classList.add(`swift-match-floating-style-${styleClass}`);
+    }
+
+    // Apply custom style
+    this.applyFloatingCustomStyle();
+    if (this.settings.floatingToggleCustomStyle) {
+      const firstClass = this.settings.floatingToggleCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+      if (firstClass) {
+        this.floatingToggle.classList.add(`swift-match-floating-style-${firstClass[1]}`);
+      }
     }
     
     // Update badge visibility based on enableSelectionMatch
     if (!this.settings.enableSelectionMatch) {
       this._listShownFromHover = false;
-      // Reset to text when search is disabled
       const toggleText = this.settings.floatingToggleText || 'Swift';
       textEl.textContent = toggleText;
     } else if (this._cachedMatchList && this._cachedMatchList.size > 0) {
       this.updateFloatingToggleBadge(this._cachedMatchList.size, this._pendingMatchCount || 0);
     }
+  }
+
+  showFloatingContextMenu(x, y) {
+    this.closeFloatingContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'swift-match-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      z-index: 100001;
+      background: var(--background-secondary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 6px;
+      padding: 4px 0;
+      min-width: 140px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      font-size: 12px;
+    `;
+
+    const items = [
+      { label: t('editFloating'), action: () => { this.closeFloatingContextMenu(); this.showFloatingEditPanel(); } },
+      { label: t('settings'), action: () => { this.closeFloatingContextMenu(); const mockEvent = { clientX: x, clientY: y, preventDefault: () => {}, stopPropagation: () => {} }; this.showSettingsPanel(mockEvent); } },
+      { type: 'separator' },
+      { label: t('hideFloating'), action: () => { this.closeFloatingContextMenu(); if (this.floatingToggleWrapper) { this.floatingToggleWrapper.remove(); this.floatingToggleWrapper = null; } this.floatingToggle = null; this.floatingToggleText = null; this.floatingSearchBox = null; this.settings.floatingToggleVisible = false; this.saveSettings(); } }
+    ];
+
+    items.forEach(item => {
+      if (item.type === 'separator') {
+        const sep = document.createElement('div');
+        sep.style.cssText = 'height:1px;background:var(--background-modifier-border);margin:4px 8px;';
+        menu.appendChild(sep);
+        return;
+      }
+      const el = document.createElement('div');
+      el.textContent = item.label;
+      el.style.cssText = `
+        padding: 6px 16px;
+        cursor: pointer;
+        color: var(--text-normal);
+        white-space: nowrap;
+        border-radius: 3px;
+        margin: 0 4px;
+      `;
+      el.addEventListener('mouseenter', () => { el.style.background = 'var(--background-modifier-hover)'; });
+      el.addEventListener('mouseleave', () => { el.style.background = ''; });
+      el.addEventListener('click', (e) => { e.stopPropagation(); item.action(); });
+      menu.appendChild(el);
+    });
+
+    // Position menu
+    const menuW = 160, menuH = items.length * 32;
+    let left = x, top = y;
+    if (left + menuW > window.innerWidth) left = window.innerWidth - menuW - 8;
+    if (top + menuH > window.innerHeight) top = window.innerHeight - menuH - 8;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    document.body.appendChild(menu);
+    this._floatingContextMenu = menu;
+
+    setTimeout(() => {
+      this._floatingContextMenuCloser = (e) => {
+        if (!menu.contains(e.target)) this.closeFloatingContextMenu();
+      };
+      document.addEventListener('mousedown', this._floatingContextMenuCloser);
+    }, 50);
+  }
+
+  closeFloatingContextMenu() {
+    if (this._floatingContextMenuCloser) {
+      document.removeEventListener('mousedown', this._floatingContextMenuCloser);
+      this._floatingContextMenuCloser = null;
+    }
+    if (this._floatingContextMenu) {
+      this._floatingContextMenu.remove();
+      this._floatingContextMenu = null;
+    }
+  }
+
+  showFloatingEditPanel() {
+    this.closeFloatingEditPanel();
+
+    const { Modal } = require('obsidian');
+    const modal = new Modal(this.app);
+    modal.titleEl.textContent = t('editTitle');
+    modal.contentEl.addClass('swift-match-edit-modal');
+
+    const currentLabel = this.settings.floatingToggleText || 'Swift';
+    const currentStyleClass = this.settings.floatingToggleStyleClass || '';
+    const currentCustomStyle = this.settings.floatingToggleCustomStyle || '';
+
+    // 横向排列：显示文字、字体大小、水平内边距、垂直内边距、透明度
+    const inlineRow = modal.contentEl.createDiv();
+    inlineRow.style.cssText = 'display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;';
+
+    const labelDiv = inlineRow.createDiv();
+    labelDiv.style.cssText = 'flex:1;min-width:100px;';
+    const labelName = labelDiv.createEl('label');
+    labelName.textContent = t('toggleText');
+    labelName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const labelInput = labelDiv.createEl('input');
+    labelInput.type = 'text';
+    labelInput.placeholder = 'Swift';
+    labelInput.value = currentLabel;
+    labelInput.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    const fontSizeDiv = inlineRow.createDiv();
+    fontSizeDiv.style.cssText = 'min-width:70px;';
+    const fontSizeLabel = fontSizeDiv.createEl('label');
+    fontSizeLabel.textContent = t('toggleFontSize');
+    fontSizeLabel.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const fontSizeInput = fontSizeDiv.createEl('input');
+    fontSizeInput.type = 'number';
+    fontSizeInput.min = 8; fontSizeInput.max = 24; fontSizeInput.step = 1;
+    fontSizeInput.value = this.settings.floatingToggleFontSize || 11;
+    fontSizeInput.style.cssText = 'width:70px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    const padHDiv = inlineRow.createDiv();
+    padHDiv.style.cssText = 'min-width:70px;';
+    const padHLabel = padHDiv.createEl('label');
+    padHLabel.textContent = t('togglePaddingH');
+    padHLabel.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const padHInput = padHDiv.createEl('input');
+    padHInput.type = 'number'; padHInput.min = 0; padHInput.max = 40; padHInput.step = 1;
+    padHInput.value = this.settings.floatingTogglePaddingH ?? 10;
+    padHInput.style.cssText = 'width:70px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    const padVDiv = inlineRow.createDiv();
+    padVDiv.style.cssText = 'min-width:70px;';
+    const padVLabel = padVDiv.createEl('label');
+    padVLabel.textContent = t('togglePaddingV');
+    padVLabel.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const padVInput = padVDiv.createEl('input');
+    padVInput.type = 'number'; padVInput.min = 0; padVInput.max = 20; padVInput.step = 1;
+    padVInput.value = this.settings.floatingTogglePaddingV ?? 2;
+    padVInput.style.cssText = 'width:70px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    const opacityDiv = inlineRow.createDiv();
+    opacityDiv.style.cssText = 'min-width:70px;';
+    const opacityLabel = opacityDiv.createEl('label');
+    opacityLabel.textContent = t('toggleOpacity');
+    opacityLabel.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const opacityInput = opacityDiv.createEl('input');
+    opacityInput.type = 'number'; opacityInput.min = 0.1; opacityInput.max = 1; opacityInput.step = 0.05;
+    opacityInput.value = this.settings.floatingToggleOpacity ?? 0.6;
+    opacityInput.style.cssText = 'width:70px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    // 样式类名
+    const styleClassDiv = modal.contentEl.createDiv();
+    styleClassDiv.style.marginBottom = '12px';
+    const styleClassName = styleClassDiv.createEl('label');
+    styleClassName.textContent = t('styleClass');
+    styleClassName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const styleClassInput = styleClassDiv.createEl('input');
+    styleClassInput.type = 'text';
+    styleClassInput.placeholder = 'CSS class name (e.g. my-style), defined in styles.css';
+    styleClassInput.value = currentStyleClass;
+    styleClassInput.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    // 自定义样式
+    const customStyleDiv = modal.contentEl.createDiv();
+    customStyleDiv.style.marginBottom = '16px';
+    const customStyleTitleRow = customStyleDiv.createDiv();
+    customStyleTitleRow.style.cssText = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;';
+    const customStyleName = customStyleTitleRow.createEl('label');
+    customStyleName.textContent = t('customStyle');
+    customStyleName.style.cssText = 'font-weight:bold;font-size:0.9em;';
+    const customStyleLink = customStyleTitleRow.createEl('a');
+    customStyleLink.textContent = t('getMoreStyles');
+    customStyleLink.href = 'https://github.com/dlsdgj/obsidian-regex-css-highlighter/discussions/1';
+    customStyleLink.target = '_blank';
+    customStyleLink.style.cssText = 'font-size:0.75em;color:var(--text-accent);';
+    const customStyleHint = customStyleDiv.createEl('div');
+    customStyleHint.textContent = t('styleHint');
+    customStyleHint.style.cssText = 'font-size:0.75em;color:var(--text-muted);margin-bottom:4px;';
+    const customStyleInput = customStyleDiv.createEl('textarea');
+    customStyleInput.placeholder = `.Swift {\n  background: transparent;\n  color: #534ab7;\n  border: 1px dashed #7f77dd;\n  border-radius: 3px;\n  padding: 1px 5px;\n}\n\n.Swift::before {\n  content: '⁕';\n  font-size: 0.7em;\n  color: #7f77dd;\n  margin-right: 3px;\n}`;
+    customStyleInput.value = currentCustomStyle;
+    customStyleInput.style.cssText = 'width:100%;min-height:160px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:13px;font-family:monospace;resize:vertical;';
+
+    // 预览区域
+    const previewDiv = modal.contentEl.createDiv();
+    previewDiv.style.cssText = 'margin-bottom:16px;padding:12px;border:1px dashed var(--background-modifier-border);border-radius:6px;text-align:center;';
+    const previewLabel = previewDiv.createEl('div');
+    previewLabel.textContent = t('preview');
+    previewLabel.style.cssText = 'font-size:0.8em;color:var(--text-muted);margin-bottom:8px;';
+    const previewSpan = previewDiv.createEl('span');
+    previewSpan.textContent = currentLabel;
+    previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
+
+    const applyPreviewStyle = (styleText) => {
+      const existingEl = document.getElementById('swift-match-preview-style');
+      if (existingEl) existingEl.remove();
+      if (!styleText.trim()) return;
+      const styleEl = document.createElement('style');
+      styleEl.id = 'swift-match-preview-style';
+      let scoped = styleText.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-floating-style-$1');
+      styleEl.textContent = scoped;
+      document.head.appendChild(styleEl);
+    };
+
+    const updatePreview = () => {
+      const newLabel = labelInput.value.trim() || 'Swift';
+      const newClass = styleClassInput.value.trim();
+      const newCustomStyle = customStyleInput.value.trim();
+      previewSpan.textContent = newLabel;
+      previewSpan.className = '';
+      previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
+      if (newClass) {
+        previewSpan.classList.add(`swift-match-floating-style-${newClass}`);
+      }
+      if (newCustomStyle) {
+        applyPreviewStyle(newCustomStyle);
+        const firstClass = newCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+        if (firstClass) {
+          previewSpan.classList.add(`swift-match-floating-style-${firstClass[1]}`);
+        }
+      } else {
+        const existingEl = document.getElementById('swift-match-preview-style');
+        if (existingEl) existingEl.remove();
+      }
+    };
+
+    labelInput.addEventListener('input', updatePreview);
+    styleClassInput.addEventListener('input', updatePreview);
+    customStyleInput.addEventListener('input', updatePreview);
+    updatePreview();
+
+    // 按钮容器
+    const buttonContainer = modal.contentEl.createEl('div');
+    buttonContainer.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;';
+    const cancelBtn = buttonContainer.createEl('button');
+    cancelBtn.textContent = t('cancel');
+    cancelBtn.style.padding = '6px 16px';
+    cancelBtn.addEventListener('click', () => modal.close());
+    const confirmBtn = buttonContainer.createEl('button');
+    confirmBtn.textContent = t('confirm');
+    confirmBtn.style.cssText = 'padding:6px 16px;background-color:var(--interactive-accent);color:white;border:none;border-radius:4px;cursor:pointer;';
+    confirmBtn.addEventListener('click', async () => {
+      this.settings.floatingToggleText = labelInput.value.trim() || 'Swift';
+      this.settings.floatingToggleFontSize = parseInt(fontSizeInput.value) || 11;
+      this.settings.floatingTogglePaddingH = parseInt(padHInput.value) || 10;
+      this.settings.floatingTogglePaddingV = parseInt(padVInput.value) || 2;
+      this.settings.floatingToggleOpacity = parseFloat(opacityInput.value) || 0.6;
+      this.settings.floatingToggleStyleClass = styleClassInput.value.trim();
+      this.settings.floatingToggleCustomStyle = customStyleInput.value.trim();
+      await this.saveSettings();
+      this.applyFloatingCustomStyle();
+      this.updateFloatingToggleStyle();
+      modal.close();
+    });
+
+    modal.open();
+    this._floatingEditModal = modal;
+  }
+
+  applyFloatingCustomStyle() {
+    const existingEl = document.getElementById('swift-match-custom-style');
+    if (existingEl) existingEl.remove();
+    const customStyle = this.settings.floatingToggleCustomStyle || '';
+    if (!customStyle.trim()) return;
+    const styleEl = document.createElement('style');
+    styleEl.id = 'swift-match-custom-style';
+    let scoped = customStyle.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-floating-style-$1');
+    styleEl.textContent = scoped;
+    document.head.appendChild(styleEl);
+  }
+
+  closeFloatingEditPanel() {
+    if (this._floatingEditModal) {
+      this._floatingEditModal.close();
+      this._floatingEditModal = null;
+    }
+    const previewEl = document.getElementById('swift-match-preview-style');
+    if (previewEl) previewEl.remove();
   }
 
   createFloatingKeywordButton(keyword, fileMap, matchCount) {
@@ -1695,6 +2087,7 @@ class MinimapPlugin extends Plugin {
       white-space: nowrap;
       line-height: 1;
       padding: 0;
+      pointer-events: none;
     `;
     textEl.textContent = displayText;
     btn.appendChild(textEl);
@@ -1712,6 +2105,11 @@ class MinimapPlugin extends Plugin {
     };
     this._floatingKeywordButtons.push(btnData);
 
+    // Apply saved styles if any
+    if (this.settings.keywordButtonStyles?.[keyword]) {
+      this.applyKeywordButtonStyle(keyword);
+    }
+
     // Persist floating keyword data
     this._updateFloatingKeywordsData();
 
@@ -1719,6 +2117,7 @@ class MinimapPlugin extends Plugin {
     let hoverTimer = null;
     wrapper.addEventListener('mouseenter', () => {
       btn.style.opacity = '1';
+      wrapper.style.zIndex = '100000';
       hoverTimer = setTimeout(() => {
         this._listUserDismissed = false;
         const cached = this._recentSearchCaches[keyword];
@@ -1737,6 +2136,7 @@ class MinimapPlugin extends Plugin {
 
     wrapper.addEventListener('mouseleave', () => {
       btn.style.opacity = '0.7';
+      wrapper.style.zIndex = '99998';
       if (hoverTimer) {
         clearTimeout(hoverTimer);
         hoverTimer = null;
@@ -1804,12 +2204,305 @@ class MinimapPlugin extends Plugin {
       document.addEventListener('mouseup', onDragEnd);
     });
 
-    // Right-click to remove
+    // Right-click context menu
     wrapper.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.removeFloatingKeywordButton(keyword);
+      this.showKeywordContextMenu(e.clientX, e.clientY, keyword);
     });
+  }
+
+  showKeywordContextMenu(x, y, keyword) {
+    this.closeFloatingContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'swift-match-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      z-index: 100001;
+      background: var(--background-secondary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 6px;
+      padding: 4px 0;
+      min-width: 120px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      font-size: 12px;
+    `;
+
+    const items = [
+      { label: t('editFloating'), action: () => { this.closeFloatingContextMenu(); this.showKeywordEditPanel(keyword); } },
+      { type: 'separator' },
+      { label: t('closeKeyword'), action: () => { this.closeFloatingContextMenu(); this.removeFloatingKeywordButton(keyword); } }
+    ];
+
+    items.forEach(item => {
+      if (item.type === 'separator') {
+        const sep = document.createElement('div');
+        sep.style.cssText = 'height:1px;background:var(--background-modifier-border);margin:4px 8px;';
+        menu.appendChild(sep);
+        return;
+      }
+      const el = document.createElement('div');
+      el.textContent = item.label;
+      el.style.cssText = `
+        padding: 6px 16px;
+        cursor: pointer;
+        color: var(--text-normal);
+        white-space: nowrap;
+        border-radius: 3px;
+        margin: 0 4px;
+      `;
+      el.addEventListener('mouseenter', () => { el.style.background = 'var(--background-modifier-hover)'; });
+      el.addEventListener('mouseleave', () => { el.style.background = ''; });
+      el.addEventListener('click', (e) => { e.stopPropagation(); item.action(); });
+      menu.appendChild(el);
+    });
+
+    let left = x, top = y;
+    if (left + 140 > window.innerWidth) left = window.innerWidth - 148;
+    if (top + 80 > window.innerHeight) top = window.innerHeight - 88;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    document.body.appendChild(menu);
+    this._floatingContextMenu = menu;
+
+    setTimeout(() => {
+      this._floatingContextMenuCloser = (e) => {
+        if (!menu.contains(e.target)) this.closeFloatingContextMenu();
+      };
+      document.addEventListener('mousedown', this._floatingContextMenuCloser);
+    }, 50);
+  }
+
+  showKeywordEditPanel(keyword) {
+    const { Modal } = require('obsidian');
+    const modal = new Modal(this.app);
+    modal.titleEl.textContent = `${t('editFloating')} - ${keyword}`;
+    modal.contentEl.addClass('swift-match-edit-modal');
+
+    const btnData = this._floatingKeywordButtons.find(b => b.term === keyword);
+    if (!btnData) { modal.close(); return; }
+
+    const savedStyles = this.settings.keywordButtonStyles?.[keyword] || {};
+    const currentStyleClass = savedStyles.styleClass || '';
+    const currentCustomStyle = savedStyles.customStyle || '';
+    const currentLabel = savedStyles.label || keyword;
+
+    // 显示文字
+    const labelDiv = modal.contentEl.createDiv();
+    labelDiv.style.marginBottom = '12px';
+    const labelName = labelDiv.createEl('label');
+    labelName.textContent = t('toggleText');
+    labelName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const labelInput = labelDiv.createEl('input');
+    labelInput.type = 'text';
+    labelInput.placeholder = keyword;
+    labelInput.value = currentLabel;
+    labelInput.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    // 样式类名
+    const styleClassDiv = modal.contentEl.createDiv();
+    styleClassDiv.style.marginBottom = '12px';
+    const styleClassName = styleClassDiv.createEl('label');
+    styleClassName.textContent = t('styleClass');
+    styleClassName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const styleClassInput = styleClassDiv.createEl('input');
+    styleClassInput.type = 'text';
+    styleClassInput.placeholder = 'CSS class name (e.g. my-style)';
+    styleClassInput.value = currentStyleClass;
+    styleClassInput.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+
+    // 自定义样式
+    const customStyleDiv = modal.contentEl.createDiv();
+    customStyleDiv.style.marginBottom = '16px';
+    const customStyleName = customStyleDiv.createEl('label');
+    customStyleName.textContent = t('customStyle');
+    customStyleName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
+    const customStyleHint = customStyleDiv.createEl('div');
+    customStyleHint.textContent = t('styleHint');
+    customStyleHint.style.cssText = 'font-size:0.75em;color:var(--text-muted);margin-bottom:4px;';
+    const customStyleInput = customStyleDiv.createEl('textarea');
+    customStyleInput.placeholder = `.keyword-btn {\n  background: transparent;\n  color: #534ab7;\n  border: 1px dashed #7f77dd;\n  border-radius: 3px;\n  padding: 1px 5px;\n}`;
+    customStyleInput.value = currentCustomStyle;
+    customStyleInput.style.cssText = 'width:100%;min-height:160px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:13px;font-family:monospace;resize:vertical;';
+
+    // 预览区域
+    const previewDiv = modal.contentEl.createDiv();
+    previewDiv.style.cssText = 'margin-bottom:16px;padding:12px;border:1px dashed var(--background-modifier-border);border-radius:6px;text-align:center;';
+    const previewLabel = previewDiv.createEl('div');
+    previewLabel.textContent = t('preview');
+    previewLabel.style.cssText = 'font-size:0.8em;color:var(--text-muted);margin-bottom:8px;';
+    const previewSpan = previewDiv.createEl('span');
+    previewSpan.textContent = currentLabel;
+    previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
+
+    const previewStyleId = `swift-match-keyword-preview-style-${keyword.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+    const applyPreviewStyle = (styleText) => {
+      const existingEl = document.getElementById(previewStyleId);
+      if (existingEl) existingEl.remove();
+      if (!styleText.trim()) return;
+      const styleEl = document.createElement('style');
+      styleEl.id = previewStyleId;
+      let scoped = styleText.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-keyword-style-$1');
+      styleEl.textContent = scoped;
+      document.head.appendChild(styleEl);
+    };
+
+    const updatePreview = () => {
+      const newLabel = labelInput.value.trim() || keyword;
+      const newClass = styleClassInput.value.trim();
+      const newCustomStyle = customStyleInput.value.trim();
+      previewSpan.textContent = newLabel;
+      previewSpan.className = '';
+      previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
+      if (newClass) {
+        previewSpan.classList.add(`swift-match-keyword-style-${newClass}`);
+      }
+      if (newCustomStyle) {
+        applyPreviewStyle(newCustomStyle);
+        const firstClass = newCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+        if (firstClass) {
+          previewSpan.classList.add(`swift-match-keyword-style-${firstClass[1]}`);
+        }
+      } else {
+        const existingEl = document.getElementById(previewStyleId);
+        if (existingEl) existingEl.remove();
+      }
+    };
+
+    labelInput.addEventListener('input', updatePreview);
+    styleClassInput.addEventListener('input', updatePreview);
+    customStyleInput.addEventListener('input', updatePreview);
+    updatePreview();
+
+    // 按钮容器
+    const buttonContainer = modal.contentEl.createEl('div');
+    buttonContainer.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;';
+    const cancelBtn = buttonContainer.createEl('button');
+    cancelBtn.textContent = t('cancel');
+    cancelBtn.style.padding = '6px 16px';
+    cancelBtn.addEventListener('click', () => modal.close());
+    const confirmBtn = buttonContainer.createEl('button');
+    confirmBtn.textContent = t('confirm');
+    confirmBtn.style.cssText = 'padding:6px 16px;background-color:var(--interactive-accent);color:white;border:none;border-radius:4px;cursor:pointer;';
+    confirmBtn.addEventListener('click', async () => {
+      const newLabel = labelInput.value.trim() || keyword;
+      const newStyleClass = styleClassInput.value.trim();
+      const newCustomStyle = customStyleInput.value.trim();
+
+      // Save to settings
+      if (!this.settings.keywordButtonStyles) this.settings.keywordButtonStyles = {};
+      this.settings.keywordButtonStyles[keyword] = {
+        label: newLabel,
+        styleClass: newStyleClass,
+        customStyle: newCustomStyle
+      };
+      await this.saveSettings();
+
+      // Apply to button
+      this.applyKeywordButtonStyle(keyword);
+      modal.close();
+    });
+
+    modal.open();
+
+    // Clean up preview style on modal close
+    const origClose = modal.close.bind(modal);
+    modal.close = () => {
+      const previewEl = document.getElementById(previewStyleId);
+      if (previewEl) previewEl.remove();
+      origClose();
+    };
+  }
+
+  applyKeywordButtonStyle(keyword) {
+    const btnData = this._floatingKeywordButtons.find(b => b.term === keyword);
+    if (!btnData) return;
+
+    const savedStyles = this.settings.keywordButtonStyles?.[keyword] || {};
+    const hasCustomStyle = !!(savedStyles.styleClass || savedStyles.customStyle);
+
+    // Update label
+    const displayLabel = savedStyles.label || keyword;
+    const displayText = displayLabel.length > 12 ? displayLabel.substring(0, 12) + '…' : displayLabel;
+    btnData.textEl.textContent = displayText;
+
+    if (hasCustomStyle) {
+      // Remove inline styles that conflict with custom CSS
+      btnData.btn.style.cssText = `
+        position: relative;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        opacity: 0.7;
+        transition: transform 0.15s ease, opacity 0.2s ease;
+      `;
+      btnData.textEl.style.cssText = `
+        font-size: 11px;
+        white-space: nowrap;
+        line-height: 1;
+        padding: 0;
+        pointer-events: none;
+      `;
+
+      // Apply style class
+      btnData.btn.className = 'swift-match-keyword-btn';
+      if (savedStyles.styleClass) {
+        btnData.btn.classList.add(`swift-match-keyword-style-${savedStyles.styleClass}`);
+      }
+
+      // Apply custom CSS
+      const styleId = `swift-match-keyword-custom-style-${keyword.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const existingEl = document.getElementById(styleId);
+      if (existingEl) existingEl.remove();
+      if (savedStyles.customStyle) {
+        const styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        let scoped = savedStyles.customStyle.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-keyword-style-$1');
+        styleEl.textContent = scoped;
+        document.head.appendChild(styleEl);
+        const firstClass = savedStyles.customStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+        if (firstClass) {
+          btnData.btn.classList.add(`swift-match-keyword-style-${firstClass[1]}`);
+        }
+      }
+    } else {
+      // Restore default styles
+      btnData.btn.style.cssText = `
+        position: relative;
+        padding: 2px 10px;
+        border-radius: 9999px;
+        background-color: rgba(240, 100, 120, 0.08);
+        box-shadow: inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05);
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        opacity: 0.7;
+        transition: transform 0.15s ease, opacity 0.2s ease;
+      `;
+      btnData.textEl.style.cssText = `
+        font-weight: 800;
+        background: linear-gradient(135deg, #f2709c, #ff9472, #f5af19, #f2709c);
+        background-size: 250% 100%;
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 6px rgba(240, 100, 120, 0.7)) drop-shadow(0 0 12px rgba(245, 150, 50, 0.5));
+        animation: hp-twilight-move 3.5s linear infinite;
+        font-size: 11px;
+        white-space: nowrap;
+        line-height: 1;
+        padding: 0;
+        pointer-events: none;
+      `;
+      btnData.btn.className = 'swift-match-keyword-btn';
+    }
   }
 
   removeFloatingKeywordButton(keyword) {
@@ -2856,33 +3549,14 @@ class MinimapPlugin extends Plugin {
     document.body.appendChild(icon);
     this._pinIcon = icon;
 
-    // Follow mouse mode
+    // Follow mouse mode: show icon at current mouse position, then stay fixed
     if (this.settings.pinIconMode === 'follow') {
-      let followTimer = null;
-      let isFollowing = true;
-      this._pinIconFollowHandler = (e) => {
-        if (!this._pinIcon) return;
-        // Reset timer on each mouse move
-        if (followTimer) clearTimeout(followTimer);
-        // Resume following and update position
-        isFollowing = true;
-        this._pinIcon.style.left = `${e.clientX + 15}px`;
-        this._pinIcon.style.top = `${e.clientY - 10}px`;
-        // Stop following after mouse is stationary for 400ms
-        followTimer = setTimeout(() => {
-          isFollowing = false;
-        }, 400);
-      };
-      this._pinIconFollowStopCheck = () => isFollowing;
-      document.addEventListener('mousemove', this._pinIconFollowHandler);
+      icon.style.left = `${this._lastMouseX + 15}px`;
+      icon.style.top = `${this._lastMouseY - 10}px`;
     }
   }
 
   hidePinIcon() {
-    if (this._pinIconFollowHandler) {
-      document.removeEventListener('mousemove', this._pinIconFollowHandler);
-      this._pinIconFollowHandler = null;
-    }
     if (this._pinIcon) {
       this._pinIcon.remove();
       this._pinIcon = null;
@@ -3546,14 +4220,29 @@ class MinimapPlugin extends Plugin {
     const textEl = this.floatingToggleText;
     if (!textEl) return;
     const toggleText = this.settings.floatingToggleText || 'Swift';
+    const isPinned = this.currentSelection && this.savedMatchLists.some(m => m.selection === this.currentSelection && m.pinned);
     if (!this.currentSelection) {
       textEl.textContent = toggleText;
     } else if (docCount > 0) {
       const docStr = docCount > 99 ? '99+' : docCount;
       const matchStr = matchCount > 0 ? (matchCount > 999 ? '999+' : matchCount) : '';
       textEl.textContent = matchStr ? `${docStr}|${matchStr}` : `${docStr}`;
+      // Show pin indicator
+      if (isPinned) {
+        const pinColorScheme = this.savedMatchLists.find(m => m.selection === this.currentSelection && m.pinned);
+        if (pinColorScheme && pinColorScheme.borderColor) {
+          this.floatingToggle.style.boxShadow = `inset 0 0 0 2px ${pinColorScheme.borderColor}, 0 2px 10px rgba(0,0,0,0.05)`;
+        }
+      }
     } else {
       textEl.textContent = toggleText;
+    }
+    // Clear pin border if not pinned
+    if (!isPinned && this.floatingToggle) {
+      const hasCustomStyle = !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
+      if (!hasCustomStyle) {
+        this.floatingToggle.style.boxShadow = 'inset 0 0 0 1px rgba(240, 120, 100, 0.4), 0 2px 10px rgba(0, 0, 0, 0.05)';
+      }
     }
     // Re-apply strikethrough if disabled
     if (!this.settings.enableSelectionMatch) {
@@ -3785,15 +4474,15 @@ class MinimapPlugin extends Plugin {
         }
         this._keepListVisible = false;
       });
-      chip.addEventListener('mouseenter', () => {
-        chip.style.background = 'var(--background-modifier-hover)';
-        chip.style.color = 'var(--text-normal)';
+      chipWrapper.addEventListener('mouseenter', () => {
+        chipWrapper.style.background = 'var(--background-modifier-hover)';
+        chipWrapper.style.color = 'var(--text-normal)';
       });
-      chip.addEventListener('mouseleave', () => {
-        chip.style.background = 'var(--background-secondary)';
-        chip.style.color = 'var(--text-muted)';
+      chipWrapper.addEventListener('mouseleave', () => {
+        chipWrapper.style.background = 'var(--background-secondary)';
+        chipWrapper.style.color = 'var(--text-muted)';
       });
-      recentItems.appendChild(chip);
+      recentItems.appendChild(chipWrapper);
     }
     recentSection.appendChild(recentItems);
     this.matchList.appendChild(recentSection);
@@ -6384,6 +7073,15 @@ class MinimapPlugin extends Plugin {
 
   onunload() {
     this.closeSettingsPanel();
+    this.closeFloatingContextMenu();
+    this.closeFloatingEditPanel();
+    // Clean up custom style elements
+    const customStyleEl = document.getElementById('swift-match-custom-style');
+    if (customStyleEl) customStyleEl.remove();
+    const previewStyleEl = document.getElementById('swift-match-preview-style');
+    if (previewStyleEl) previewStyleEl.remove();
+    // Clean up keyword button custom styles
+    document.querySelectorAll('[id^="swift-match-keyword-custom-style-"],[id^="swift-match-keyword-preview-style-"]').forEach(el => el.remove());
     this.hidePinIcon();
     this.removeEditorPadding();
     const statusBar = document.querySelector('.status-bar');
