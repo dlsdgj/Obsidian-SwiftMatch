@@ -32,6 +32,15 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog</summary>
 
 <details>
+<summary>v1.3.7 (2026-06-16)</summary>
+
+- **Settings Panel Restructure** — Moved "Show/Hide Floating Button" under "Floating Button Style" heading; renamed "Floating Toggle Style" to "Floating Button Style"; added "minimap" section title in Basic tab
+- **Minimap Blacklist** — New blacklist setting under minimap section to hide minimap on specific pages (supports * wildcard); default rule `*.canvas` hides minimap on canvas pages; supports path matching for non-markdown views
+- **Pin Icon Fix** — Pin icon now appears only once after text selection; no longer re-creates on repeated events
+
+</details>
+
+<details>
 <summary>v1.3.6 (2026-06-16)</summary>
 
 - **Cache Limit Increased** — Recent search cache limit raised from 10 to 20
@@ -157,6 +166,15 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.7 (2026-06-16)</summary>
+
+- **设置面板重组** — "显示/隐藏悬浮按钮"移至"悬浮按钮样式"标题下方；"悬浮球样式"改名为"悬浮按钮样式"；基础tab下新增"minimap"分组标题
+- **minimap 黑名单** — minimap 分类下新增黑名单设置，支持通配符匹配路径屏蔽页面；默认规则 `*.canvas` 屏蔽画布页面；支持非 markdown 视图的路径匹配
+- **固定按钮修复** — 选中文字后固定按钮只显示一次，不再因重复事件重复创建
+
+</details>
 
 <details>
 <summary>v1.3.6 (2026-06-16)</summary>

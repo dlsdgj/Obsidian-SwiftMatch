@@ -1,6 +1,12 @@
 # Changelog
 
-## 🆕 v1.3.6 (2026-06-16)
+## 🆕 v1.3.7 (2026-06-16)
+
+- **Settings Panel Restructure** — Moved "Show/Hide Floating Button" under "Floating Button Style" heading; renamed "Floating Toggle Style" to "Floating Button Style"; added "minimap" section title in Basic tab
+- **Minimap Blacklist** — New blacklist setting under minimap section to hide minimap on specific pages (supports * wildcard); default rule `*.canvas` hides minimap on canvas pages; supports path matching for non-markdown views
+- **Pin Icon Fix** — Pin icon now appears only once after text selection; no longer re-creates on repeated events
+
+## v1.3.6 (2026-06-16)
 
 - **Cache Limit Increased** — Recent search cache limit raised from 10 to 20
 - **Middle-Click Cache Cleanup** — Middle-clicking to delete a recent search now also removes its disk cache file

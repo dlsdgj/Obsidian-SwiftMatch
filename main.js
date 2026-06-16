@@ -104,6 +104,7 @@ const DEFAULT_SETTINGS = {
   floatingToggleStyleClass: '',
   floatingToggleCustomStyle: '',
   keywordButtonStyles: {},
+  minimapBlacklist: '*.canvas',
   searchWordCountMin: 0,
   searchWordCountMax: 0,
   language: 'zh'
@@ -128,7 +129,10 @@ const I18N = {
     floatingToggleText: '悬浮球显示文字',
     showFloating: '悬浮显示',
     toggleFloatingBtn: '显示/隐藏悬浮按钮',
-    floatingToggleStyle: '悬浮球样式',
+    floatingToggleStyle: '悬浮按钮样式',
+    minimap: 'minimap',
+    minimapBlacklist: 'minimap 黑名单',
+    minimapBlacklistDesc: '匹配路径的页面不显示 minimap（每行一个，支持 * 通配符）',
     fontSize: '文字大小 (px)',
     paddingH: '水平内边距 (px)',
     paddingV: '垂直内边距 (px)',
@@ -231,7 +235,10 @@ const I18N = {
     floatingToggleText: 'Floating Toggle Text',
     showFloating: 'Show Floating',
     toggleFloatingBtn: 'Show/Hide Floating Button',
-    floatingToggleStyle: 'Floating Toggle Style',
+    floatingToggleStyle: 'Floating Button Style',
+    minimap: 'minimap',
+    minimapBlacklist: 'Minimap Blacklist',
+    minimapBlacklistDesc: 'Pages matching these paths will not show minimap (one per line, * wildcard supported)',
     fontSize: 'Font Size (px)',
     paddingH: 'Horizontal Padding (px)',
     paddingV: 'Vertical Padding (px)',
@@ -774,6 +781,11 @@ class MinimapPlugin extends Plugin {
       </div>
       <div class="minimap-settings-content">
         <div class="minimap-settings-tab-content active" data-tab="basic">
+          <div class="minimap-settings-section-title">${t('minimap')}</div>
+          <div class="minimap-settings-row" style="flex-direction:column;align-items:stretch;">
+            <label>${t('minimapBlacklist')}<span style="font-weight:normal;font-size:11px;color:var(--text-muted);display:block;margin-top:2px;">${t('minimapBlacklistDesc')}</span></label>
+            <textarea id="minimap-blacklist" rows="3" style="width:100%;margin-top:4px;font-size:12px;resize:vertical;background:var(--background-modifier-form-field);color:var(--text-normal);border:1px solid var(--background-modifier-border);border-radius:4px;padding:4px 6px;">${this.settings.minimapBlacklist || ''}</textarea>
+          </div>
           <div class="minimap-settings-row">
             <label>${t('topDistance')}</label>
             <input type="number" id="minimap-top" value="${this.settings.top}" min="0" max="500">
@@ -816,11 +828,11 @@ class MinimapPlugin extends Plugin {
             <label>${t('collapseWidth')}</label>
             <input type="number" id="minimap-collapsewidth" value="${this.settings.collapseWidth}" min="4" max="50">
           </div>
+          <div class="minimap-settings-section-title">${t('floatingToggleStyle')}</div>
           <div class="minimap-settings-row">
             <label>${t('toggleFloatingBtn')}</label>
             <button class="minimap-floating-toggle-btn" id="minimap-showfloatingtoggle" style="position:relative;padding:2px 10px;border-radius:9999px;background-color:rgba(240,100,120,0.08);box-shadow:inset 0 0 0 1px rgba(240,120,100,0.4),0 2px 10px rgba(0,0,0,0.05);cursor:pointer;font-weight:800;background:linear-gradient(135deg,#f2709c,#ff9472,#f5af19,#f2709c);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:12px;border:none;outline:none;">Swift</button>
           </div>
-          <div class="minimap-settings-section-title">${t('floatingToggleStyle')}</div>
           <div class="minimap-settings-row">
             <label>${t('fontSize')}</label>
             <input type="number" id="minimap-floatingtogglefontsize" value="${this.settings.floatingToggleFontSize ?? 11}" min="8" max="24">
@@ -1075,6 +1087,7 @@ class MinimapPlugin extends Plugin {
     document.addEventListener('mousedown', this.boundOutsideClick);
     
     const inputs = {
+      blacklist: this.settingsPanel.querySelector('#minimap-blacklist'),
       top: this.settingsPanel.querySelector('#minimap-top'),
       width: this.settingsPanel.querySelector('#minimap-width'),
       maxwidth: this.settingsPanel.querySelector('#minimap-maxwidth'),
@@ -1120,6 +1133,7 @@ class MinimapPlugin extends Plugin {
     const floatingToggleOpacityValue = this.settingsPanel.querySelector('#minimap-floatingtoggleopacity-value');
     
     const updateSettings = () => {
+      this.settings.minimapBlacklist = inputs.blacklist.value;
       this.settings.top = parseFloat(inputs.top.value) || DEFAULT_SETTINGS.top;
       this.settings.width = parseFloat(inputs.width.value) || DEFAULT_SETTINGS.width;
       this.settings.maxWidth = parseFloat(inputs.maxwidth.value) || DEFAULT_SETTINGS.maxWidth;
@@ -2883,10 +2897,47 @@ class MinimapPlugin extends Plugin {
     });
   }
 
+  _isMinimapBlacklisted() {
+    const leaf = this.app.workspace.activeLeaf;
+    if (!leaf) return false;
+    let filePath = leaf.view?.file?.path;
+    if (!filePath) {
+      const leafEl = leaf.containerEl || leaf.view?.containerEl;
+      if (leafEl) {
+        const navEl = leafEl.querySelector('.view-header-title');
+        if (navEl) {
+          const name = navEl.textContent?.trim();
+          if (name) {
+            const found = this.app.vault.getFiles().find(f => f.name === name || f.basename === name);
+            if (found) filePath = found.path;
+          }
+        }
+      }
+    }
+    if (!filePath) return false;
+    const blacklist = (this.settings.minimapBlacklist || '').split('\n').map(s => s.trim()).filter(Boolean);
+    for (const pattern of blacklist) {
+      const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+      if (regex.test(filePath)) return true;
+    }
+    return false;
+  }
+
   setupMinimap() {
     const workspace = this.app.workspace;
     const activeLeaf = workspace.activeLeaf;
     if (!activeLeaf) return;
+
+    if (this._isMinimapBlacklisted()) {
+      this.removeEditorPadding();
+      if (this.minimapContainer && this.minimapContainer.parentNode) {
+        this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+      }
+      this.minimapContainer = null;
+      this.minimapContent = null;
+      this.slider = null;
+      return;
+    }
 
     const editorEl = activeLeaf.view.containerEl;
     if (!editorEl) return;
@@ -3551,6 +3602,7 @@ class MinimapPlugin extends Plugin {
   showPinIcon() {
     if (!this.settings.pinIconEnabled) return;
     if (!this.currentSelection) return;
+    if (this._pinIcon) return;
 
     // Check if current selection is already pinned
     const exactPinned = this.savedMatchLists.find(m => m.selection === this.currentSelection && m.pinned);
