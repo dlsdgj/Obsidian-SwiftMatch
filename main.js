@@ -211,6 +211,13 @@ const I18N = {
     getMoreStyles: '(获取更多样式)',
     styleHint: '支持完整CSS格式，含伪元素。类名会自动作用域化。',
     preview: '预览',
+    styleName: '样式名称',
+    addStyle: '+ 添加样式',
+    deleteStyle: '删除',
+    setDefault: '默认',
+    defaultStyle: '默认',
+    noStyles: '暂无自定义样式，请使用 .className { } 格式定义',
+    clickToSelect: '点击选择',
     confirm: '确认',
     cancel: '取消',
     close: '关闭',
@@ -317,6 +324,13 @@ const I18N = {
     getMoreStyles: '(Get More Styles)',
     styleHint: 'Supports full CSS format including pseudo-elements. Class names are auto-scoped.',
     preview: 'Preview',
+    styleName: 'Style Name',
+    addStyle: '+ Add Style',
+    deleteStyle: 'Delete',
+    setDefault: 'Default',
+    defaultStyle: 'Default',
+    noStyles: 'No custom styles detected, use .className { } format',
+    clickToSelect: 'Click to select',
     confirm: 'Confirm',
     cancel: 'Cancel',
     close: 'Close',
@@ -392,6 +406,8 @@ class MinimapPlugin extends Plugin {
     this.listPosition = { left: null, top: null };
     this.listFixedPosition = { left: null, top: null };
     this.previewListPosition = { left: null, top: null };
+    this.floatingStyles = [];
+    this.floatingDefaultStyleId = null;
     this.listOpacity = 1.0;
     this.previewOpacity = 1.0;
     this.previewSize = { width: 600, height: 600 };
@@ -431,6 +447,7 @@ class MinimapPlugin extends Plugin {
   onload() {
     this.loadSettings();
     this.loadListData();
+    this.loadFloatingStyleData();
     this.opacity = this.settings.opacity;
     this.addCommands();
     this.boundMouseMove = this.handleMouseMove.bind(this);
@@ -629,6 +646,59 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  async loadFloatingStyleData() {
+    const dataDir = this.app.vault.configDir || '.obsidian';
+    this.floatingStyleDataPath = `${dataDir}/plugins/swift-match/data.json`;
+    try {
+      const adapter = this.app.vault.adapter;
+      if (await adapter.exists(this.floatingStyleDataPath)) {
+        const content = await adapter.read(this.floatingStyleDataPath);
+        const data = JSON.parse(content);
+        this.floatingStyles = data.floatingStyles || [];
+        this.floatingDefaultStyleId = data.floatingDefaultStyleId || null;
+      } else {
+        this.floatingStyles = [];
+        this.floatingDefaultStyleId = null;
+      }
+      // Migrate old single customStyle to new multi-style format
+      if (this.floatingStyles.length === 0 && this.settings.floatingToggleCustomStyle) {
+        this.floatingStyles.push({
+          id: Date.now().toString(),
+          name: this.settings.floatingToggleText || 'Swift',
+          styleClass: this.settings.floatingToggleStyleClass || '',
+          customStyle: this.settings.floatingToggleCustomStyle || ''
+        });
+        this.floatingDefaultStyleId = this.floatingStyles[0].id;
+        await this.saveFloatingStyleData();
+      }
+    } catch (e) {
+      console.error('Failed to load floating style data:', e);
+      this.floatingStyles = [];
+      this.floatingDefaultStyleId = null;
+    }
+  }
+
+  async saveFloatingStyleData() {
+    if (!this.floatingStyleDataPath) return;
+    try {
+      const adapter = this.app.vault.adapter;
+      const data = {
+        floatingStyles: this.floatingStyles,
+        floatingDefaultStyleId: this.floatingDefaultStyleId
+      };
+      await adapter.write(this.floatingStyleDataPath, JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.error('Failed to save floating style data:', e);
+    }
+  }
+
+  getActiveFloatingStyle() {
+    if (!this.floatingDefaultStyleId || !this.floatingStyles || this.floatingStyles.length === 0) {
+      return null;
+    }
+    return this.floatingStyles.find(s => s.id === this.floatingDefaultStyleId) || null;
+  }
+
   applySettings() {
     if (!this.minimapContainer) return;
     
@@ -786,118 +856,132 @@ class MinimapPlugin extends Plugin {
             <label>${t('minimapBlacklist')}<span style="font-weight:normal;font-size:11px;color:var(--text-muted);display:block;margin-top:2px;">${t('minimapBlacklistDesc')}</span></label>
             <textarea id="minimap-blacklist" rows="3" style="width:100%;margin-top:4px;font-size:12px;resize:vertical;background:var(--background-modifier-form-field);color:var(--text-normal);border:1px solid var(--background-modifier-border);border-radius:4px;padding:4px 6px;">${this.settings.minimapBlacklist || ''}</textarea>
           </div>
-          <div class="minimap-settings-row">
-            <label>${t('topDistance')}</label>
-            <input type="number" id="minimap-top" value="${this.settings.top}" min="0" max="500">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('topDistance')}</label>
+              <input type="number" id="minimap-top" value="${this.settings.top}" min="0" max="500" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('width')}</label>
+              <input type="number" id="minimap-width" value="${this.settings.width}" min="1" max="20" step="0.5" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('maxWidth')}</label>
+              <input type="number" id="minimap-maxwidth" value="${this.settings.maxWidth}" min="20" max="200" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('bottomOffset')}</label>
+              <input type="number" id="minimap-heightoffset" value="${this.settings.heightOffset}" min="0" max="200" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('rightOffset')}</label>
+              <input type="number" id="minimap-rightoffset" value="${this.settings.rightOffset}" min="-100" max="200" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
           </div>
-          <div class="minimap-settings-row">
-            <label>${t('width')}</label>
-            <input type="number" id="minimap-width" value="${this.settings.width}" min="1" max="20" step="0.5">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('sliderColor')}</label>
+              <input type="color" id="minimap-slidercolor" value="${this.settings.sliderColor}" style="width:36px;height:26px;padding:0;border:1px solid var(--background-modifier-border);border-radius:4px;cursor:pointer;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('opacity')}</label>
+              <input type="range" id="minimap-opacity" value="${this.settings.opacity}" min="0.1" max="1" step="0.1" style="width:70px;">
+              <span id="minimap-opacity-value" style="font-size:11px;min-width:24px;">${this.settings.opacity}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('contentOpacity')}</label>
+              <input type="range" id="minimap-contentopacity" value="${this.settings.contentOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
+              <span id="minimap-contentopacity-value" style="font-size:11px;min-width:24px;">${this.settings.contentOpacity}</span>
+            </div>
           </div>
-          <div class="minimap-settings-row">
-            <label>${t('maxWidth')}</label>
-            <input type="number" id="minimap-maxwidth" value="${this.settings.maxWidth}" min="20" max="200">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('bottomOffset')}</label>
-            <input type="number" id="minimap-heightoffset" value="${this.settings.heightOffset}" min="0" max="200">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('rightOffset')}</label>
-            <input type="number" id="minimap-rightoffset" value="${this.settings.rightOffset}" min="-100" max="200">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('sliderColor')}</label>
-            <input type="color" id="minimap-slidercolor" value="${this.settings.sliderColor}">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('opacity')}</label>
-            <input type="range" id="minimap-opacity" value="${this.settings.opacity}" min="0.1" max="1" step="0.1">
-            <span id="minimap-opacity-value">${this.settings.opacity}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('contentOpacity')}</label>
-            <input type="range" id="minimap-contentopacity" value="${this.settings.contentOpacity}" min="0.1" max="1" step="0.1">
-            <span id="minimap-contentopacity-value">${this.settings.contentOpacity}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('hoverExpand')}</label>
-            <input type="checkbox" id="minimap-collapseonhover" ${this.settings.collapseOnHover ? 'checked' : ''}>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('collapseWidth')}</label>
-            <input type="number" id="minimap-collapsewidth" value="${this.settings.collapseWidth}" min="4" max="50">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('hoverExpand')}</label>
+              <input type="checkbox" id="minimap-collapseonhover" ${this.settings.collapseOnHover ? 'checked' : ''}>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('collapseWidth')}</label>
+              <input type="number" id="minimap-collapsewidth" value="${this.settings.collapseWidth}" min="4" max="50" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
           </div>
           <div class="minimap-settings-section-title">${t('floatingToggleStyle')}</div>
-          <div class="minimap-settings-row">
-            <label>${t('toggleFloatingBtn')}</label>
-            <button class="minimap-floating-toggle-btn" id="minimap-showfloatingtoggle" style="position:relative;padding:2px 10px;border-radius:9999px;background-color:rgba(240,100,120,0.08);box-shadow:inset 0 0 0 1px rgba(240,120,100,0.4),0 2px 10px rgba(0,0,0,0.05);cursor:pointer;font-weight:800;background:linear-gradient(135deg,#f2709c,#ff9472,#f5af19,#f2709c);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:12px;border:none;outline:none;">Swift</button>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('fontSize')}</label>
-            <input type="number" id="minimap-floatingtogglefontsize" value="${this.settings.floatingToggleFontSize ?? 11}" min="8" max="24">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('paddingH')}</label>
-            <input type="number" id="minimap-floatingtogglepaddingh" value="${this.settings.floatingTogglePaddingH ?? 10}" min="2" max="30">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('paddingV')}</label>
-            <input type="number" id="minimap-floatingtogglepaddingv" value="${this.settings.floatingTogglePaddingV ?? 2}" min="0" max="15">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('opacity')}</label>
-            <input type="range" id="minimap-floatingtoggleopacity" value="${this.settings.floatingToggleOpacity ?? 0.6}" min="0.1" max="1" step="0.05">
-            <span id="minimap-floatingtoggleopacity-value">${this.settings.floatingToggleOpacity ?? 0.6}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('hideStatusBar')}</label>
-            <input type="checkbox" id="minimap-hidestatusbar" ${this.settings.hideStatusBar ? 'checked' : ''}>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('toggleFloatingBtn')}</label>
+              <span id="minimap-showfloatingtoggle" style="cursor:pointer;display:inline-block;">${this.settings.floatingToggleText || 'Swift'}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('fontSize')}</label>
+              <input type="number" id="minimap-floatingtogglefontsize" value="${this.settings.floatingToggleFontSize ?? 11}" min="8" max="24" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('paddingH')}</label>
+              <input type="number" id="minimap-floatingtogglepaddingh" value="${this.settings.floatingTogglePaddingH ?? 10}" min="2" max="30" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('paddingV')}</label>
+              <input type="number" id="minimap-floatingtogglepaddingv" value="${this.settings.floatingTogglePaddingV ?? 2}" min="0" max="15" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('opacity')}</label>
+              <input type="range" id="minimap-floatingtoggleopacity" value="${this.settings.floatingToggleOpacity ?? 0.6}" min="0.1" max="1" step="0.05" style="width:70px;">
+              <span id="minimap-floatingtoggleopacity-value" style="font-size:11px;min-width:28px;">${this.settings.floatingToggleOpacity ?? 0.6}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('hideStatusBar')}</label>
+              <input type="checkbox" id="minimap-hidestatusbar" ${this.settings.hideStatusBar ? 'checked' : ''}>
+            </div>
           </div>
           <div class="minimap-settings-section-title">${t('searchLimit')}</div>
-          <div class="minimap-settings-row">
-            <label>${t('minWords')}</label>
-            <input type="number" id="minimap-searchwordcountmin" value="${this.settings.searchWordCountMin ?? 0}" min="0" max="100">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('maxWords')}</label>
-            <input type="number" id="minimap-searchwordcountmax" value="${this.settings.searchWordCountMax ?? 0}" min="0" max="100">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('minWords')}</label>
+              <input type="number" id="minimap-searchwordcountmin" value="${this.settings.searchWordCountMin ?? 0}" min="0" max="100" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('maxWords')}</label>
+              <input type="number" id="minimap-searchwordcountmax" value="${this.settings.searchWordCountMax ?? 0}" min="0" max="100" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
           </div>
         </div>
         <div class="minimap-settings-tab-content" data-tab="counter">
           <div class="minimap-settings-section-title">${t('pinIcon')}</div>
-          <div class="minimap-settings-row">
-            <label>${t('enablePinIcon')}</label>
-            <input type="checkbox" id="minimap-piniconenabled" ${this.settings.pinIconEnabled ? 'checked' : ''}>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('iconMode')}</label>
-            <select id="minimap-piniconmode">
-              <option value="follow" ${this.settings.pinIconMode === 'follow' ? 'selected' : ''}>${t('followMouse')}</option>
-              <option value="fixed" ${this.settings.pinIconMode === 'fixed' ? 'selected' : ''}>${t('fixedPosition')}</option>
-            </select>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('iconSize')}</label>
-            <input type="number" id="minimap-piniconsize" value="${this.settings.pinIconSize}" min="12" max="40">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('iconOpacity')}</label>
-            <input type="range" id="minimap-piniconopacity" value="${this.settings.pinIconOpacity}" min="0.1" max="1" step="0.1">
-            <span id="minimap-piniconopacity-value">${this.settings.pinIconOpacity}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('iconText')}</label>
-            <input type="text" id="minimap-pinicontext" value="${this.settings.pinIconText || 'm'}" style="width:40px;text-align:center;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('enablePinIcon')}</label>
+              <input type="checkbox" id="minimap-piniconenabled" ${this.settings.pinIconEnabled ? 'checked' : ''}>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('iconMode')}</label>
+              <select id="minimap-piniconmode" style="padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+                <option value="follow" ${this.settings.pinIconMode === 'follow' ? 'selected' : ''}>${t('followMouse')}</option>
+                <option value="fixed" ${this.settings.pinIconMode === 'fixed' ? 'selected' : ''}>${t('fixedPosition')}</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('iconSize')}</label>
+              <input type="number" id="minimap-piniconsize" value="${this.settings.pinIconSize}" min="12" max="40" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('iconOpacity')}</label>
+              <input type="range" id="minimap-piniconopacity" value="${this.settings.pinIconOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
+              <span id="minimap-piniconopacity-value" style="font-size:11px;min-width:24px;">${this.settings.pinIconOpacity}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('iconText')}</label>
+              <input type="text" id="minimap-pinicontext" value="${this.settings.pinIconText || 'm'}" style="width:40px;text-align:center;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
           </div>
           <div id="minimap-follow-offset-section" style="display:${this.settings.pinIconMode === 'follow' ? 'block' : 'none'};">
-            <div class="minimap-settings-row">
-              <label>${t('followOffsetX')}</label>
-              <input type="number" id="minimap-piniconfollowoffsetx" value="${this.settings.pinIconFollowOffsetX ?? 15}" min="-100" max="100" step="1">
-            </div>
-            <div class="minimap-settings-row">
-              <label>${t('followOffsetY')}</label>
-              <input type="number" id="minimap-piniconfollowoffsety" value="${this.settings.pinIconFollowOffsetY ?? -10}" min="-100" max="100" step="1">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+              <div style="display:flex;align-items:center;gap:4px;">
+                <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('followOffsetX')}</label>
+                <input type="number" id="minimap-piniconfollowoffsetx" value="${this.settings.pinIconFollowOffsetX ?? 15}" min="-100" max="100" step="1" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('followOffsetY')}</label>
+                <input type="number" id="minimap-piniconfollowoffsety" value="${this.settings.pinIconFollowOffsetY ?? -10}" min="-100" max="100" step="1" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+              </div>
             </div>
             <div id="minimap-follow-offset-preview" style="position:relative;width:120px;height:80px;margin:6px auto;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-secondary);overflow:hidden;">
               <div id="minimap-follow-offset-cursor" style="position:absolute;width:6px;height:6px;background:var(--text-muted);border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%);"></div>
@@ -912,36 +996,40 @@ class MinimapPlugin extends Plugin {
           <div id="minimap-color-schemes"></div>
           <button id="minimap-add-colorscheme" style="width:100%;margin-top:6px;padding:4px 8px;cursor:pointer;">${t('addColor')}</button>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('counterStyle')}</div>
-          <div class="minimap-settings-row">
-            <label>${t('matchOpacity')}</label>
-            <input type="range" id="minimap-matchopacity" value="${this.settings.matchOpacity ?? 0.6}" min="0.1" max="1" step="0.05">
-            <span id="minimap-matchopacity-value">${this.settings.matchOpacity ?? 0.6}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('matchOpacity')}</label>
+              <input type="range" id="minimap-matchopacity" value="${this.settings.matchOpacity ?? 0.6}" min="0.1" max="1" step="0.05" style="width:70px;">
+              <span id="minimap-matchopacity-value" style="font-size:11px;min-width:28px;">${this.settings.matchOpacity ?? 0.6}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterOpacity')}</label>
+              <input type="range" id="minimap-counteropacity" value="${this.settings.counterOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
+              <span id="minimap-counteropacity-value" style="font-size:11px;min-width:24px;">${this.settings.counterOpacity}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterBgOpacity')}</label>
+              <input type="range" id="minimap-counterbgopacity" value="${this.settings.counterBgOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
+              <span id="minimap-counterbgopacity-value" style="font-size:11px;min-width:24px;">${this.settings.counterBgOpacity}</span>
+            </div>
           </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterOpacity')}</label>
-            <input type="range" id="minimap-counteropacity" value="${this.settings.counterOpacity}" min="0.1" max="1" step="0.1">
-            <span id="minimap-counteropacity-value">${this.settings.counterOpacity}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterBgOpacity')}</label>
-            <input type="range" id="minimap-counterbgopacity" value="${this.settings.counterBgOpacity}" min="0.1" max="1" step="0.1">
-            <span id="minimap-counterbgopacity-value">${this.settings.counterBgOpacity}</span>
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterFontSize')}</label>
-            <input type="number" id="minimap-countersize" value="${this.settings.counterSize}" min="6" max="16">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterPaddingH')}</label>
-            <input type="number" id="minimap-counterpaddingh" value="${this.settings.counterPaddingH}" min="0" max="10">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterPaddingV')}</label>
-            <input type="number" id="minimap-counterpaddingv" value="${this.settings.counterPaddingV}" min="-10" max="10" step="1">
-          </div>
-          <div class="minimap-settings-row">
-            <label>${t('counterTopOffset')}</label>
-            <input type="number" id="minimap-countertopoffset" value="${this.settings.counterTopOffset}" min="-30" max="10">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterFontSize')}</label>
+              <input type="number" id="minimap-countersize" value="${this.settings.counterSize}" min="6" max="16" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterPaddingH')}</label>
+              <input type="number" id="minimap-counterpaddingh" value="${this.settings.counterPaddingH}" min="0" max="10" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterPaddingV')}</label>
+              <input type="number" id="minimap-counterpaddingv" value="${this.settings.counterPaddingV}" min="-10" max="10" step="1" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterTopOffset')}</label>
+              <input type="number" id="minimap-countertopoffset" value="${this.settings.counterTopOffset}" min="-30" max="10" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+            </div>
           </div>
         </div>
         <div class="minimap-settings-tab-content" data-tab="pinned">
@@ -1262,6 +1350,42 @@ class MinimapPlugin extends Plugin {
     
 
     const floatingToggleBtn = this.settingsPanel.querySelector('#minimap-showfloatingtoggle');
+    // Apply current floating toggle style to the settings preview span
+    const applyBtnStyle = () => {
+      const el = floatingToggleBtn;
+      const activeStyle = this.getActiveFloatingStyle();
+      const styleClass = activeStyle ? (activeStyle.styleClass || '') : (this.settings.floatingToggleStyleClass || '');
+      const customStyle = activeStyle ? (activeStyle.customStyle || '') : (this.settings.floatingToggleCustomStyle || '');
+      const hasCustomStyle = !!(styleClass || customStyle);
+      const text = this.settings.floatingToggleText || 'Swift';
+      const fontSize = this.settings.floatingToggleFontSize || 11;
+      const opacity = this.settings.floatingToggleOpacity ?? 0.6;
+      el.textContent = text;
+
+      if (hasCustomStyle) {
+        el.style.cssText = `cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:${fontSize}px;opacity:${opacity};white-space:nowrap;line-height:1;padding:0;`;
+        el.className = '';
+        if (styleClass) el.classList.add(`swift-match-floating-style-${styleClass}`);
+        // Inject scoped CSS for preview
+        let previewStyleEl = document.getElementById('swift-match-settings-preview-style');
+        if (!previewStyleEl) {
+          previewStyleEl = document.createElement('style');
+          previewStyleEl.id = 'swift-match-settings-preview-style';
+          document.head.appendChild(previewStyleEl);
+        }
+        if (customStyle) {
+          let scoped = customStyle.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-floating-style-$1');
+          previewStyleEl.textContent = scoped;
+          const firstClass = customStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+          if (firstClass && !styleClass) el.classList.add(`swift-match-floating-style-${firstClass[1]}`);
+        }
+      } else {
+        el.className = '';
+        el.style.cssText = `cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:${fontSize}px;opacity:${opacity};white-space:nowrap;line-height:1;padding:2px 10px;border-radius:9999px;background-color:rgba(240,100,120,0.08);box-shadow:inset 0 0 0 1px rgba(240,120,100,0.4),0 2px 10px rgba(0,0,0,0.05);font-weight:800;background:linear-gradient(135deg,#f2709c,#ff9472,#f5af19,#f2709c);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 6px rgba(240,100,120,0.7)) drop-shadow(0 0 12px rgba(245,150,50,0.5));animation:hp-twilight-move 3.5s linear infinite;`;
+      }
+    };
+    applyBtnStyle();
+    this._applySettingsBtnStyle = applyBtnStyle;
     floatingToggleBtn.addEventListener('click', () => {
       if (this.floatingToggleWrapper) {
         this.floatingToggleWrapper.remove();
@@ -1471,6 +1595,10 @@ class MinimapPlugin extends Plugin {
       this.settingsPanel.remove();
       this.settingsPanel = null;
     }
+    this._applySettingsBtnStyle = null;
+    // Clean up settings preview style
+    const previewStyleEl = document.getElementById('swift-match-settings-preview-style');
+    if (previewStyleEl) previewStyleEl.remove();
   }
 
   createFloatingToggle() {
@@ -1827,7 +1955,12 @@ class MinimapPlugin extends Plugin {
     const toggleText = this.settings.floatingToggleText || 'Swift';
     textEl.textContent = toggleText;
 
-    const hasCustomStyle = !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
+    // 优先从data.json获取当前激活样式
+    const activeStyle = this.getActiveFloatingStyle();
+    const currentStyleClass = activeStyle ? (activeStyle.styleClass || '') : (this.settings.floatingToggleStyleClass || '');
+    const currentCustomStyle = activeStyle ? (activeStyle.customStyle || '') : (this.settings.floatingToggleCustomStyle || '');
+
+    const hasCustomStyle = !!(currentStyleClass || currentCustomStyle);
 
     if (hasCustomStyle) {
       // When custom style is applied, remove inline styles so CSS classes take full control
@@ -1898,21 +2031,21 @@ class MinimapPlugin extends Plugin {
     }
 
     // Apply style class
-    const styleClass = this.settings.floatingToggleStyleClass || '';
     // Remove previous style classes
     this.floatingToggle.className = this.floatingToggle.className
       .split(' ')
       .filter(c => !c.startsWith('swift-match-floating-style-'))
       .join(' ')
       .trim();
-    if (styleClass) {
-      this.floatingToggle.classList.add(`swift-match-floating-style-${styleClass}`);
+    if (currentStyleClass) {
+      this.floatingToggle.classList.add(`swift-match-floating-style-${currentStyleClass}`);
     }
 
     // Apply custom style
     this.applyFloatingCustomStyle();
-    if (this.settings.floatingToggleCustomStyle) {
-      const firstClass = this.settings.floatingToggleCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
+    // Only apply firstClass from CSS when no explicit styleClass is selected
+    if (!currentStyleClass && currentCustomStyle) {
+      const firstClass = currentCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
       if (firstClass) {
         this.floatingToggle.classList.add(`swift-match-floating-style-${firstClass[1]}`);
       }
@@ -2014,8 +2147,6 @@ class MinimapPlugin extends Plugin {
     modal.contentEl.addClass('swift-match-edit-modal');
 
     const currentLabel = this.settings.floatingToggleText || 'Swift';
-    const currentStyleClass = this.settings.floatingToggleStyleClass || '';
-    const currentCustomStyle = this.settings.floatingToggleCustomStyle || '';
 
     // 横向排列：显示文字、字体大小、水平内边距、垂直内边距、透明度
     const inlineRow = modal.contentEl.createDiv();
@@ -2073,86 +2204,127 @@ class MinimapPlugin extends Plugin {
     opacityInput.value = this.settings.floatingToggleOpacity ?? 0.6;
     opacityInput.style.cssText = 'width:70px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
 
-    // 样式类名
-    const styleClassDiv = modal.contentEl.createDiv();
-    styleClassDiv.style.marginBottom = '12px';
-    const styleClassName = styleClassDiv.createEl('label');
-    styleClassName.textContent = t('styleClass');
-    styleClassName.style.cssText = 'display:block;margin-bottom:4px;font-weight:bold;font-size:0.9em;';
-    const styleClassInput = styleClassDiv.createEl('input');
-    styleClassInput.type = 'text';
-    styleClassInput.placeholder = 'CSS class name (e.g. my-style), defined in styles.css';
-    styleClassInput.value = currentStyleClass;
-    styleClassInput.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:14px;';
+    // 自定义样式区域：一个CSS文本框 + 点击选择预览
+    const stylesHeader = modal.contentEl.createDiv();
+    stylesHeader.style.cssText = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;';
+    const stylesTitle = stylesHeader.createEl('label');
+    stylesTitle.textContent = t('customStyle');
+    stylesTitle.style.cssText = 'font-weight:bold;font-size:0.9em;';
+    const stylesLink = stylesHeader.createEl('a');
+    stylesLink.textContent = t('getMoreStyles');
+    stylesLink.href = 'https://github.com/dlsdgj/obsidian-regex-css-highlighter/discussions/1';
+    stylesLink.target = '_blank';
+    stylesLink.style.cssText = 'font-size:0.75em;color:var(--text-accent);';
 
-    // 自定义样式
-    const customStyleDiv = modal.contentEl.createDiv();
-    customStyleDiv.style.marginBottom = '16px';
-    const customStyleTitleRow = customStyleDiv.createDiv();
-    customStyleTitleRow.style.cssText = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;';
-    const customStyleName = customStyleTitleRow.createEl('label');
-    customStyleName.textContent = t('customStyle');
-    customStyleName.style.cssText = 'font-weight:bold;font-size:0.9em;';
-    const customStyleLink = customStyleTitleRow.createEl('a');
-    customStyleLink.textContent = t('getMoreStyles');
-    customStyleLink.href = 'https://github.com/dlsdgj/obsidian-regex-css-highlighter/discussions/1';
-    customStyleLink.target = '_blank';
-    customStyleLink.style.cssText = 'font-size:0.75em;color:var(--text-accent);';
-    const customStyleHint = customStyleDiv.createEl('div');
-    customStyleHint.textContent = t('styleHint');
-    customStyleHint.style.cssText = 'font-size:0.75em;color:var(--text-muted);margin-bottom:4px;';
-    const customStyleInput = customStyleDiv.createEl('textarea');
-    customStyleInput.placeholder = `.Swift {\n  background: transparent;\n  color: #534ab7;\n  border: 1px dashed #7f77dd;\n  border-radius: 3px;\n  padding: 1px 5px;\n}\n\n.Swift::before {\n  content: '⁕';\n  font-size: 0.7em;\n  color: #7f77dd;\n  margin-right: 3px;\n}`;
-    customStyleInput.value = currentCustomStyle;
-    customStyleInput.style.cssText = 'width:100%;min-height:160px;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:13px;font-family:monospace;resize:vertical;';
+    const stylesHint = modal.contentEl.createEl('div');
+    stylesHint.textContent = t('styleHint');
+    stylesHint.style.cssText = 'font-size:0.75em;color:var(--text-muted);margin-bottom:4px;';
 
-    // 预览区域
-    const previewDiv = modal.contentEl.createDiv();
-    previewDiv.style.cssText = 'margin-bottom:16px;padding:12px;border:1px dashed var(--background-modifier-border);border-radius:6px;text-align:center;';
-    const previewLabel = previewDiv.createEl('div');
-    previewLabel.textContent = t('preview');
-    previewLabel.style.cssText = 'font-size:0.8em;color:var(--text-muted);margin-bottom:8px;';
-    const previewSpan = previewDiv.createEl('span');
-    previewSpan.textContent = currentLabel;
-    previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
+    // 注入预览用的style标签
+    let previewStyleEl = document.getElementById('swift-match-preview-style');
+    if (!previewStyleEl) {
+      previewStyleEl = document.createElement('style');
+      previewStyleEl.id = 'swift-match-preview-style';
+      document.head.appendChild(previewStyleEl);
+    }
 
-    const applyPreviewStyle = (styleText) => {
-      const existingEl = document.getElementById('swift-match-preview-style');
-      if (existingEl) existingEl.remove();
-      if (!styleText.trim()) return;
-      const styleEl = document.createElement('style');
-      styleEl.id = 'swift-match-preview-style';
-      let scoped = styleText.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-floating-style-$1');
-      styleEl.textContent = scoped;
-      document.head.appendChild(styleEl);
-    };
+    // CSS文本框
+    const cssTextarea = modal.contentEl.createEl('textarea');
+    cssTextarea.value = this.settings.floatingToggleCustomStyle || '';
+    cssTextarea.placeholder = `.Swift {\n  background: transparent;\n  color: #534ab7;\n  border: 1px dashed #7f77dd;\n  border-radius: 3px;\n  padding: 1px 5px;\n}\n\n.Swift2 {\n  background: #e8f5e9;\n  color: #2e7d32;\n  border-radius: 12px;\n  padding: 2px 12px;\n}`;
+    cssTextarea.rows = 10;
+    cssTextarea.style.cssText = 'width:100%;padding:8px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;font-family:monospace;resize:vertical;line-height:1.5;margin-bottom:8px;';
 
-    const updatePreview = () => {
-      const newLabel = labelInput.value.trim() || 'Swift';
-      const newClass = styleClassInput.value.trim();
-      const newCustomStyle = customStyleInput.value.trim();
-      previewSpan.textContent = newLabel;
-      previewSpan.className = '';
-      previewSpan.style.cssText = 'display:inline-block;padding:4px 8px;';
-      if (newClass) {
-        previewSpan.classList.add(`swift-match-floating-style-${newClass}`);
-      }
-      if (newCustomStyle) {
-        applyPreviewStyle(newCustomStyle);
-        const firstClass = newCustomStyle.match(/\.([a-zA-Z_-][\w-]*)/);
-        if (firstClass) {
-          previewSpan.classList.add(`swift-match-floating-style-${firstClass[1]}`);
+    // 预览选择区域
+    const previewAreaLabel = modal.contentEl.createEl('div');
+    previewAreaLabel.textContent = t('preview') + ' - ' + t('clickToSelect') + '：';
+    previewAreaLabel.style.cssText = 'font-weight:600;margin-bottom:6px;font-size:0.9em;';
+
+    const previewArea = modal.contentEl.createDiv();
+    previewArea.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;padding:12px;border-radius:6px;border:1px solid var(--background-modifier-border);background:var(--background-secondary);';
+
+    // 当前选中的class
+    let selectedClass = this.settings.floatingToggleStyleClass || '';
+
+    // 解析CSS中的class名
+    const parseCSSClasses = (cssText) => {
+      const classes = [];
+      const regex = /\.([a-zA-Z0-9_-]+)(?:::[\w-]+|:[\w-]+)*\s*\{/g;
+      let match;
+      const seen = new Set();
+      while ((match = regex.exec(cssText)) !== null) {
+        const cls = match[1];
+        if (!seen.has(cls)) {
+          seen.add(cls);
+          classes.push(cls);
         }
-      } else {
-        const existingEl = document.getElementById('swift-match-preview-style');
-        if (existingEl) existingEl.remove();
       }
+      return classes;
     };
 
+    // 构建预览
+    const buildPreviews = () => {
+      previewArea.empty();
+      const cssText = cssTextarea.value;
+      // 作用域化CSS并注入预览
+      let scoped = cssText.replace(/\.([a-zA-Z_-][\w-]*)/g, '.swift-match-floating-style-$1');
+      previewStyleEl.textContent = scoped;
+
+      const classes = parseCSSClasses(cssText);
+      if (classes.length === 0) {
+        const hint = previewArea.createEl('div');
+        hint.textContent = t('noStyles');
+        hint.style.cssText = 'color:var(--text-muted);font-size:12px;';
+        return;
+      }
+
+      classes.forEach(cls => {
+        const wrapper = previewArea.createDiv();
+        wrapper.style.cssText = `
+          display:flex;flex-direction:column;align-items:center;gap:4px;
+          cursor:pointer;padding:6px;border-radius:6px;
+          border:2px solid ${cls === selectedClass ? 'var(--interactive-accent)' : 'transparent'};
+          transition:border-color 0.15s;
+        `;
+        wrapper.addEventListener('mouseenter', () => {
+          if (cls !== selectedClass) wrapper.style.borderColor = 'var(--background-modifier-border)';
+        });
+        wrapper.addEventListener('mouseleave', () => {
+          wrapper.style.borderColor = cls === selectedClass ? 'var(--interactive-accent)' : 'transparent';
+        });
+
+        const previewEl = wrapper.createEl('div');
+        previewEl.className = `swift-match-floating-style-${cls}`;
+        previewEl.textContent = labelInput.value.trim() || currentLabel;
+        previewEl.style.cssText = 'position:static;cursor:pointer;z-index:auto;opacity:1;';
+        wrapper.appendChild(previewEl);
+
+        const nameEl = wrapper.createEl('div');
+        nameEl.textContent = `.${cls}`;
+        nameEl.style.cssText = 'font-size:10px;color:var(--text-muted);font-family:monospace;';
+
+        // 默认标记
+        if (cls === selectedClass) {
+          const defaultBadge = wrapper.createEl('div');
+          defaultBadge.textContent = t('defaultStyle');
+          defaultBadge.style.cssText = 'font-size:9px;color:var(--interactive-accent);font-weight:600;';
+        }
+
+        wrapper.addEventListener('click', () => {
+          selectedClass = cls;
+          buildPreviews();
+        });
+
+        previewArea.appendChild(wrapper);
+      });
+    };
+
+    buildPreviews();
+
+    // 实时更新预览
+    const updatePreview = () => { buildPreviews(); };
     labelInput.addEventListener('input', updatePreview);
-    styleClassInput.addEventListener('input', updatePreview);
-    customStyleInput.addEventListener('input', updatePreview);
-    updatePreview();
+    cssTextarea.addEventListener('input', updatePreview);
 
     // 按钮容器
     const buttonContainer = modal.contentEl.createEl('div');
@@ -2170,11 +2342,23 @@ class MinimapPlugin extends Plugin {
       this.settings.floatingTogglePaddingH = parseInt(padHInput.value) || 10;
       this.settings.floatingTogglePaddingV = parseInt(padVInput.value) || 2;
       this.settings.floatingToggleOpacity = parseFloat(opacityInput.value) || 0.6;
-      this.settings.floatingToggleStyleClass = styleClassInput.value.trim();
-      this.settings.floatingToggleCustomStyle = customStyleInput.value.trim();
+      this.settings.floatingToggleStyleClass = selectedClass;
+      this.settings.floatingToggleCustomStyle = cssTextarea.value.trim();
+
+      // 保存到data.json
+      this.floatingStyles = [{
+        id: this.floatingDefaultStyleId || Date.now().toString(),
+        name: 'default',
+        styleClass: selectedClass,
+        customStyle: cssTextarea.value.trim()
+      }];
+      this.floatingDefaultStyleId = this.floatingStyles[0].id;
+
       await this.saveSettings();
+      await this.saveFloatingStyleData();
       this.applyFloatingCustomStyle();
       this.updateFloatingToggleStyle();
+      if (this._applySettingsBtnStyle) this._applySettingsBtnStyle();
       modal.close();
     });
 
@@ -2185,7 +2369,9 @@ class MinimapPlugin extends Plugin {
   applyFloatingCustomStyle() {
     const existingEl = document.getElementById('swift-match-custom-style');
     if (existingEl) existingEl.remove();
-    const customStyle = this.settings.floatingToggleCustomStyle || '';
+    // 优先从data.json获取当前激活样式
+    const activeStyle = this.getActiveFloatingStyle();
+    const customStyle = activeStyle ? (activeStyle.customStyle || '') : (this.settings.floatingToggleCustomStyle || '');
     if (!customStyle.trim()) return;
     const styleEl = document.createElement('style');
     styleEl.id = 'swift-match-custom-style';
@@ -2199,6 +2385,8 @@ class MinimapPlugin extends Plugin {
       this._floatingEditModal.close();
       this._floatingEditModal = null;
     }
+    // 清理所有预览样式
+    document.querySelectorAll('[id^="swift-match-preview-style-"]').forEach(el => el.remove());
     const previewEl = document.getElementById('swift-match-preview-style');
     if (previewEl) previewEl.remove();
   }
@@ -4493,7 +4681,8 @@ class MinimapPlugin extends Plugin {
     }
     // Clear pin border if not pinned
     if (!isPinned && this.floatingToggle) {
-      const hasCustomStyle = !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
+      const activeStyle = this.getActiveFloatingStyle();
+      const hasCustomStyle = activeStyle ? !!(activeStyle.styleClass || activeStyle.customStyle) : !!(this.settings.floatingToggleStyleClass || this.settings.floatingToggleCustomStyle);
       if (hasCustomStyle) {
         this.floatingToggle.style.boxShadow = '';
       } else {

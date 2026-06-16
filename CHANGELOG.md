@@ -1,6 +1,14 @@
 # Changelog
 
-## 🆕 v1.3.7 (2026-06-16)
+## 🆕 v1.3.8 (2026-06-17)
+
+- **Multi-Style Support** — Floating edit panel now supports multiple custom CSS styles with auto-parsed class previews; click to select default style
+- **Style Persistence** — Custom styles saved to data.json, preserving user styles across plugin updates
+- **Style Stacking Fix** — Fixed bug where applying a new style would stack with the previous one
+- **Compact Settings Layout** — "Basic", "Counter Style", and "Pin Icon" sections reorganized to horizontal compact layout
+- **Live Style Preview** — Floating button in settings panel now displays actual current style as clickable text
+
+## v1.3.7 (2026-06-16)
 
 - **Settings Panel Restructure** — Moved "Show/Hide Floating Button" under "Floating Button Style" heading; renamed "Floating Toggle Style" to "Floating Button Style"; added "minimap" section title in Basic tab
 - **Minimap Blacklist** — New blacklist setting under minimap section to hide minimap on specific pages (supports * wildcard); default rule `*.canvas` hides minimap on canvas pages; supports path matching for non-markdown views

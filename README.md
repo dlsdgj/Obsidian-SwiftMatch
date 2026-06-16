@@ -32,6 +32,17 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog</summary>
 
 <details>
+<summary>v1.3.8 (2026-06-17)</summary>
+
+- **Multi-Style Support** — Floating edit panel now supports multiple custom CSS styles with auto-parsed class previews; click to select default style
+- **Style Persistence** — Custom styles saved to data.json, preserving user styles across plugin updates
+- **Style Stacking Fix** — Fixed bug where applying a new style would stack with the previous one
+- **Compact Settings Layout** — "Basic", "Counter Style", and "Pin Icon" sections reorganized to horizontal compact layout
+- **Live Style Preview** — Floating button in settings panel now displays actual current style as clickable text
+
+</details>
+
+<details>
 <summary>v1.3.7 (2026-06-16)</summary>
 
 - **Settings Panel Restructure** — Moved "Show/Hide Floating Button" under "Floating Button Style" heading; renamed "Floating Toggle Style" to "Floating Button Style"; added "minimap" section title in Basic tab
@@ -166,6 +177,17 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.8 (2026-06-17)</summary>
+
+- **多组样式支持** — 编辑悬浮球窗口支持多组自定义CSS样式，自动解析class并预览，点击选择默认样式
+- **样式数据持久化** — 自定义样式保存到data.json，插件更新时不覆盖用户样式
+- **修复样式叠加** — 修复应用新样式时与旧样式叠加的bug
+- **设置面板紧凑布局** — "基础"、"计数样式"、"固定图标"部分改为横向紧凑布局
+- **实时样式预览** — 设置面板中的悬浮按钮改为可点击文字，实时显示当前样式
+
+</details>
 
 <details>
 <summary>v1.3.7 (2026-06-16)</summary>
