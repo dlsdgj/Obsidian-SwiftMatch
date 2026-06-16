@@ -32,6 +32,22 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog</summary>
 
 <details>
+<summary>v1.3.6 (2026-06-16)</summary>
+
+- **Cache Limit Increased** — Recent search cache limit raised from 10 to 20
+- **Middle-Click Cache Cleanup** — Middle-clicking to delete a recent search now also removes its disk cache file
+- **Empty State Match Window** — Hovering the floating toggle with no selection, cache, or recent searches now shows the match window with search box
+- **Search Box in Header** — Moved search input into the header bar alongside match info to save vertical space
+- **Close Clears Search Box** — Closing the match window now clears the search input
+- **Search Term Highlight** — Matched keywords are highlighted with orange background in the match list results
+- **Favorites Feature** — Star button on recent search chips to add/remove favorites; favorites section with persistent cache; middle-click to delete; scroll position saved
+- **Compact Layout** — Favorites and recent searches labels now inline with chips on the same row
+- **Expand All at Once** — Clicking the "+" expand button now reveals the full line instead of incrementing by 30 chars; expanded state is preserved across reopens
+- **Selected Text Open Document** — When text is selected in the match list, clicking "Open Document" highlights the selected text instead of the auto-detected text
+
+</details>
+
+<details>
 <summary>v1.3.5 (2026-06-16)</summary>
 
 - **Open Document Jump Fix** — Full-text search instead of per-line search; suppress Remember Cursor Position plugin restore; scroll to vertical center
@@ -141,6 +157,22 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 
 <details>
 <summary>更新日志</summary>
+
+<details>
+<summary>v1.3.6 (2026-06-16)</summary>
+
+- **缓存上限提升** — 最近搜索缓存上限从10提升到20
+- **中键删除缓存文件** — 中键删除最近搜索词时一并删除磁盘缓存文件
+- **空状态匹配窗口** — 无选中文字、无缓存、无最近搜索时，悬浮按钮hover也弹出匹配窗口
+- **搜索框移入标题栏** — 搜索框移至匹配信息header中，压缩纵向空间
+- **关闭清除搜索框** — 关闭匹配窗口时清空搜索框文字
+- **搜索词高亮** — 匹配列表结果中高亮显示搜索关键词
+- **收藏功能** — 最近搜索词前添加五角星按钮，点击收藏/取消；收藏区独立显示，缓存不清除；中键删除；滚动位置保存
+- **紧凑布局** — 收藏和最近搜索标签与关键词同一行显示
+- **一键展开全文** — 点击"+"按钮直接展开整行内容，展开状态跨次保留
+- **选中文字打开文档** — 匹配窗口选中文字后点击"打开文档"，高亮选中文字而非自动检测文字
+
+</details>
 
 <details>
 <summary>v1.3.5 (2026-06-16)</summary>

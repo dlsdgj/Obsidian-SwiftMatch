@@ -1,6 +1,19 @@
 # Changelog
 
-## 🆕 v1.3.5 (2026-06-16)
+## 🆕 v1.3.6 (2026-06-16)
+
+- **Cache Limit Increased** — Recent search cache limit raised from 10 to 20
+- **Middle-Click Cache Cleanup** — Middle-clicking to delete a recent search now also removes its disk cache file
+- **Empty State Match Window** — Hovering the floating toggle with no selection, cache, or recent searches now shows the match window with search box
+- **Search Box in Header** — Moved search input into the header bar alongside match info to save vertical space
+- **Close Clears Search Box** — Closing the match window now clears the search input
+- **Search Term Highlight** — Matched keywords are highlighted with orange background in the match list results
+- **Favorites Feature** — Star button on recent search chips to add/remove favorites; favorites section with persistent cache; middle-click to delete; scroll position saved
+- **Compact Layout** — Favorites and recent searches labels now inline with chips on the same row
+- **Expand All at Once** — Clicking the "+" expand button now reveals the full line instead of incrementing by 30 chars; expanded state is preserved across reopens
+- **Selected Text Open Document** — When text is selected in the match list, clicking "Open Document" highlights the selected text instead of the auto-detected text
+
+## v1.3.5 (2026-06-16)
 
 - **Open Document Jump Fix** — Full-text search instead of per-line search; suppress Remember Cursor Position plugin restore; scroll to vertical center
 - **Marshmallow Highlight** — Jump text highlighted with custom marshmallow style after opening document; click anywhere in editor to dismiss

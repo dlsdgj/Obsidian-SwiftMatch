@@ -177,6 +177,9 @@ const I18N = {
     clearPinned: (n) => `清除${n}个固定项`,
     pinMatch: '固定此匹配',
     recentSearch: '最近搜索',
+    favoriteSearch: '收藏',
+    addFavorite: '收藏',
+    removeFavorite: '取消收藏',
     floatThisWord: '悬浮此词',
     removeFloat: '移除悬浮此词',
     exhaustiveMatch: (n, m) => `全库匹配: ${n} 个文档 (${m} 项结果)`,
@@ -277,6 +280,9 @@ const I18N = {
     clearPinned: (n) => `Clear ${n} pinned items`,
     pinMatch: 'Pin this match',
     recentSearch: 'Recent Searches',
+    favoriteSearch: 'Favorites',
+    addFavorite: 'Favorite',
+    removeFavorite: 'Unfavorite',
     floatThisWord: 'Float this word',
     removeFloat: 'Remove floating',
     exhaustiveMatch: (n, m) => `Exhaustive: ${n} docs (${m} results)`,
@@ -408,6 +414,7 @@ class MinimapPlugin extends Plugin {
     this._recentSearches = [];
     this._recentSearchCaches = {}; // { term: { fileMap, matchCount } }
     this._recentSearchCachesData = []; // deprecated, kept for migration
+    this._favoriteSearches = [];
     this._listScrollPositions = {}; // { term: scrollTop }
     this._floatingKeywordButtons = []; // [{ wrapper, term, fileMap, matchCount, position }]
     this._floatingKeywordsData = []; // deprecated, kept for migration
@@ -482,6 +489,7 @@ class MinimapPlugin extends Plugin {
         this.savedMatchLists = data.savedMatchLists || [];
         this._matchListScrollTop = data.matchListScrollTop || 0;
         this._recentSearches = data.recentSearches || [];
+        this._favoriteSearches = data.favoriteSearches || [];
         this._listScrollPositions = data.listScrollPositions || {};
       }
     } catch (e) {
@@ -528,6 +536,15 @@ class MinimapPlugin extends Plugin {
       return { fileMap, matchCount: data.matchCount || 0 };
     } catch (e) {
       return null;
+    }
+  }
+
+  async deleteSearchCache(term) {
+    const adapter = this.app.vault.adapter;
+    const fileName = this._cacheKeyToFileName(term);
+    const filePath = `${this.cacheDir}/${fileName}.json`;
+    if (await adapter.exists(filePath)) {
+      try { await adapter.remove(filePath); } catch (e) {}
     }
   }
 
@@ -590,6 +607,7 @@ class MinimapPlugin extends Plugin {
         savedMatchLists: this.savedMatchLists,
         matchListScrollTop: this._matchListScrollTop || 0,
         recentSearches: this._recentSearches || [],
+        favoriteSearches: this._favoriteSearches || [],
         listScrollPositions: this._listScrollPositions || {}
       };
       await adapter.write(this.listDataPath, JSON.stringify(data, null, 2));
@@ -1619,7 +1637,13 @@ class MinimapPlugin extends Plugin {
             this.positionListNearFloatingToggle();
           } else {
             this.showRecentSearchList();
+            this._listShownFromHover = true;
+            this.positionListNearFloatingToggle();
           }
+        } else {
+          this.showRecentSearchList();
+          this._listShownFromHover = true;
+          this.positionListNearFloatingToggle();
         }
       }, 200);
     });
@@ -4562,8 +4586,177 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  _createSearchChip(term, options = {}) {
+    const { isFavorite, isCurrentSearch, searchText } = options;
+    const chip = document.createElement('span');
+    chip.className = 'minimap-match-list-recent-chip';
+    const baseBg = isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-secondary)';
+    const baseColor = isCurrentSearch ? 'var(--text-on-accent)' : 'var(--text-muted)';
+    const baseBorder = isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-modifier-border)';
+    chip.style.cssText = `font-size:11px;padding:1px 6px;border-radius:8px;cursor:pointer;border:1px solid ${baseBorder};background:${baseBg};color:${baseColor};white-space:nowrap;transition:background 0.15s,color 0.15s;display:inline-flex;align-items:center;gap:3px;`;
+    chip.textContent = term;
+
+    const isFav = this._favoriteSearches.includes(term);
+
+    const chipStar = document.createElement('span');
+    chipStar.textContent = isFav ? '★' : '☆';
+    chipStar.style.cssText = `font-size:10px;cursor:pointer;color:${isFav ? '#ff6600' : 'var(--text-faint)'};transition:color 0.15s;line-height:1;flex-shrink:0;`;
+    chipStar.title = isFav ? t('removeFavorite') : t('addFavorite');
+    chipStar.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.isInteractingWithList = true;
+    });
+    chipStar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const favIdx = this._favoriteSearches.indexOf(term);
+      if (favIdx >= 0) {
+        this._favoriteSearches.splice(favIdx, 1);
+        chipStar.textContent = '☆';
+        chipStar.style.color = 'var(--text-faint)';
+        chipStar.title = t('addFavorite');
+      } else {
+        this._favoriteSearches.push(term);
+        chipStar.textContent = '★';
+        chipStar.style.color = '#ff6600';
+        chipStar.title = t('removeFavorite');
+      }
+      this.saveListData();
+      const favSection = this.matchList?.querySelector('.swift-match-favorites-section');
+      if (favSection) {
+        const parent = favSection.parentNode;
+        parent.removeChild(favSection);
+        const newFavSection = this._createFavoritesSection(searchText);
+        const recentSec = this.matchList?.querySelector('.minimap-match-list-recent');
+        if (recentSec) {
+          parent.insertBefore(newFavSection, recentSec);
+        } else {
+          parent.appendChild(newFavSection);
+        }
+      }
+    });
+    chip.insertBefore(chipStar, chip.firstChild);
+
+    const chipPin = document.createElement('span');
+    const isAlreadyFloating = this._floatingKeywordButtons.some(b => b.term === term);
+    chipPin.textContent = '📌';
+    chipPin.style.cssText = `font-size:9px;cursor:pointer;opacity:${isAlreadyFloating ? '1' : '0.3'};transition:opacity 0.15s;line-height:1;flex-shrink:0;`;
+    chipPin.title = isAlreadyFloating ? t('removeFloat') : t('floatThisWord');
+    chipPin.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.isInteractingWithList = true;
+    });
+    chipPin.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const isFloating = this._floatingKeywordButtons.some(b => b.term === term);
+      if (isFloating) {
+        this.removeFloatingKeywordButton(term);
+        chipPin.style.opacity = '0.3';
+        chipPin.title = t('floatThisWord');
+      } else {
+        const cached = this._recentSearchCaches[term];
+        if (cached && cached.fileMap && cached.fileMap.size > 0) {
+          this.createFloatingKeywordButton(term, cached.fileMap, cached.matchCount);
+        } else {
+          this.createFloatingKeywordButton(term, new Map(), 0);
+        }
+        chipPin.style.opacity = '1';
+        chipPin.title = t('removeFloat');
+      }
+    });
+    chip.appendChild(chipPin);
+
+    chip.addEventListener('mousedown', (e) => {
+      if (e.target === chipStar || e.target === chipPin) return;
+      e.stopPropagation();
+      this.isInteractingWithList = true;
+      if (e.button === 1) {
+        e.preventDefault();
+        if (isFavorite) {
+          const favIdx = this._favoriteSearches.indexOf(term);
+          if (favIdx >= 0) this._favoriteSearches.splice(favIdx, 1);
+          delete this._recentSearchCaches[term];
+          this.deleteSearchCache(term);
+        } else {
+          const idx = this._recentSearches.indexOf(term);
+          if (idx >= 0) this._recentSearches.splice(idx, 1);
+          if (!this._favoriteSearches.includes(term)) {
+            delete this._recentSearchCaches[term];
+            this.deleteSearchCache(term);
+          }
+        }
+        this.saveListData();
+        chip.remove();
+      }
+    });
+    chip.addEventListener('click', (e) => {
+      if (e.target === chipStar || e.target === chipPin) return;
+      e.stopPropagation();
+      this.isInteractingWithList = true;
+      this._keepListVisible = true;
+      this.currentSelection = term;
+      this._listUserDismissed = false;
+      this._exhaustiveSearchDone = false;
+      const cached = this._recentSearchCaches[term];
+      if (cached && cached.fileMap && cached.fileMap.size > 0) {
+        this._cachedMatchList = cached.fileMap;
+        this._cachedMatchListKey = term;
+        this._pendingMatchCount = cached.matchCount;
+        this._pendingSearchText = term;
+        this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
+        this.highlightMatches();
+        this.renderMatchList(cached.fileMap, cached.matchCount, false);
+        this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
+      } else {
+        this.highlightMatches();
+      }
+      this._keepListVisible = false;
+    });
+    chip.addEventListener('mouseenter', () => {
+      if (!isCurrentSearch) {
+        chip.style.background = 'var(--background-modifier-hover)';
+        chip.style.color = 'var(--text-normal)';
+      }
+    });
+    chip.addEventListener('mouseleave', () => {
+      if (!isCurrentSearch) {
+        chip.style.background = 'var(--background-secondary)';
+        chip.style.color = 'var(--text-muted)';
+      }
+    });
+    return chip;
+  }
+
+  _createFavoritesSection(searchText) {
+    const section = document.createElement('div');
+    section.className = 'swift-match-favorites-section';
+    section.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);max-height:80px;overflow-y:auto;display:flex;flex-wrap:wrap;align-items:center;gap:4px;';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:10px;color:var(--text-faint);flex-shrink:0;';
+    label.textContent = t('favoriteSearch');
+    section.appendChild(label);
+
+    for (const term of this._favoriteSearches) {
+      const isCurrentSearch = term === searchText;
+      const chip = this._createSearchChip(term, { isFavorite: true, isCurrentSearch, searchText });
+      section.appendChild(chip);
+    }
+
+    if (this._favoriteSearches.length === 0) {
+      section.style.display = 'none';
+    }
+    if (this._favSectionScrollTop) {
+      requestAnimationFrame(() => { section.scrollTop = this._favSectionScrollTop; });
+    }
+    return section;
+  }
+
   showRecentSearchList() {
-    if (!this.matchList || this._recentSearches.length === 0) return;
+    if (!this.matchList) return;
     
     this.matchList.innerHTML = '';
     
@@ -4577,97 +4770,33 @@ class MinimapPlugin extends Plugin {
     headerText.className = 'minimap-match-list-header-text';
     headerText.textContent = t('recentSearch');
     header.appendChild(headerText);
+
+    if (this.floatingSearchBox) {
+      this.floatingSearchBox.placeholder = t('searchPlaceholder');
+      this.floatingSearchBox.style.marginLeft = '8px';
+      header.appendChild(this.floatingSearchBox);
+    }
     this.matchList.appendChild(header);
+
+    // Favorites section
+    const favSection = this._createFavoritesSection('');
+    this.matchList.appendChild(favSection);
 
     // Recent searches section
     const recentSection = document.createElement('div');
     recentSection.className = 'minimap-match-list-recent';
-    recentSection.style.cssText = 'padding:6px 8px;overflow-y:auto;';
+    recentSection.style.cssText = 'padding:6px 8px;overflow-y:auto;display:flex;flex-wrap:wrap;align-items:center;gap:4px;';
 
-    const recentItems = document.createElement('div');
-    recentItems.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+    const recentLabel = document.createElement('span');
+    recentLabel.style.cssText = 'font-size:10px;color:var(--text-faint);flex-shrink:0;';
+    recentLabel.textContent = t('recentSearch');
+    recentSection.appendChild(recentLabel);
 
-    const searchesToShow = this._recentSearches.slice(0, 10);
+    const searchesToShow = this._recentSearches.slice(0, 20);
     for (const term of searchesToShow) {
-      const chipWrapper = document.createElement('span');
-      chipWrapper.className = 'minimap-match-list-recent-chip';
-      chipWrapper.style.cssText = 'font-size:12px;padding:3px 8px 3px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--background-modifier-border);background:var(--background-secondary);color:var(--text-muted);white-space:nowrap;transition:background 0.15s,color 0.15s;position:relative;display:inline-flex;align-items:center;gap:3px;';
-      chipWrapper.textContent = term;
-
-      // Add pin/float button
-      const chipPin = document.createElement('span');
-      const isAlreadyFloating = this._floatingKeywordButtons.some(b => b.term === term);
-      chipPin.textContent = '📌';
-      chipPin.style.cssText = `font-size:9px;cursor:pointer;opacity:${isAlreadyFloating ? '1' : '0.3'};transition:opacity 0.15s;line-height:1;flex-shrink:0;`;
-      chipPin.title = isAlreadyFloating ? t('removeFloat') : t('floatThisWord');
-      chipPin.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        this.isInteractingWithList = true;
-      });
-      chipPin.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const isFloating = this._floatingKeywordButtons.some(b => b.term === term);
-        if (isFloating) {
-          this.removeFloatingKeywordButton(term);
-          chipPin.style.opacity = '0.3';
-          chipPin.title = t('floatThisWord');
-        } else {
-          const cached = this._recentSearchCaches[term];
-          if (cached && cached.fileMap && cached.fileMap.size > 0) {
-            this.createFloatingKeywordButton(term, cached.fileMap, cached.matchCount);
-          } else {
-            this.createFloatingKeywordButton(term, new Map(), 0);
-          }
-          chipPin.style.opacity = '1';
-          chipPin.title = t('removeFloat');
-        }
-      });
-      chipWrapper.appendChild(chipPin);
-
-      chipWrapper.addEventListener('mousedown', (e) => {
-        if (e.target === chipPin) return;
-        e.stopPropagation();
-        this.isInteractingWithList = true;
-      });
-      chipWrapper.addEventListener('click', (e) => {
-        if (e.target === chipPin) return;
-        e.stopPropagation();
-        this.isInteractingWithList = true;
-        this._keepListVisible = true;
-        this.currentSelection = term;
-        this._listUserDismissed = false;
-        this._exhaustiveSearchDone = false;
-        // Try to use cached results for instant display
-        const cached = this._recentSearchCaches[term];
-        if (cached && cached.fileMap && cached.fileMap.size > 0) {
-          this._cachedMatchList = cached.fileMap;
-          this._cachedMatchListKey = term;
-          this._pendingMatchCount = cached.matchCount;
-          this._pendingSearchText = term;
-          this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
-          // Highlight in current document
-          this.highlightMatches();
-          // Render cached match list
-          this.renderMatchList(cached.fileMap, cached.matchCount, false);
-          this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
-        } else {
-          this.highlightMatches();
-        }
-        this._keepListVisible = false;
-      });
-      chipWrapper.addEventListener('mouseenter', () => {
-        chipWrapper.style.background = 'var(--background-modifier-hover)';
-        chipWrapper.style.color = 'var(--text-normal)';
-      });
-      chipWrapper.addEventListener('mouseleave', () => {
-        chipWrapper.style.background = 'var(--background-secondary)';
-        chipWrapper.style.color = 'var(--text-muted)';
-      });
-      recentItems.appendChild(chipWrapper);
+      const chipWrapper = this._createSearchChip(term, { searchText: '' });
+      recentSection.appendChild(chipWrapper);
     }
-    recentSection.appendChild(recentItems);
     this.matchList.appendChild(recentSection);
 
     // Add resize handle
@@ -4729,9 +4858,12 @@ class MinimapPlugin extends Plugin {
       const idx = this._recentSearches.indexOf(searchText);
       if (idx >= 0) this._recentSearches.splice(idx, 1);
       this._recentSearches.unshift(searchText);
-      if (this._recentSearches.length > 10) {
+      if (this._recentSearches.length > 20) {
         const removed = this._recentSearches.pop();
-        delete this._recentSearchCaches[removed];
+        if (!this._favoriteSearches.includes(removed)) {
+          delete this._recentSearchCaches[removed];
+          this.deleteSearchCache(removed);
+        }
       }
     }
 
@@ -5124,127 +5256,35 @@ class MinimapPlugin extends Plugin {
         saveBtn.style.background = 'var(--background-secondary)';
       });
       header.appendChild(saveBtn);
+
+      if (this.floatingSearchBox) {
+        this.floatingSearchBox.placeholder = t('searchPlaceholder');
+        this.floatingSearchBox.style.marginLeft = '8px';
+        header.appendChild(this.floatingSearchBox);
+      }
       
       this.matchList.appendChild(header);
 
-      // Search input at top of match list
-      if (this.floatingSearchBox) {
-        this.floatingSearchBox.placeholder = t('searchPlaceholder');
-      }
-      const searchRow = document.createElement('div');
-      searchRow.className = 'swift-match-search-row';
-      searchRow.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;';
-      searchRow.appendChild(this.floatingSearchBox);
-      this.matchList.appendChild(searchRow);
+      // Favorites section
+      const favSection = this._createFavoritesSection(searchText);
+      this.matchList.appendChild(favSection);
 
       // Recent searches section in header
       const recentSection = document.createElement('div');
       recentSection.className = 'minimap-match-list-recent';
-      recentSection.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);max-height:80px;overflow-y:auto;';
+      recentSection.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);max-height:80px;overflow-y:auto;display:flex;flex-wrap:wrap;align-items:center;gap:4px;';
 
-      const recentLabel = document.createElement('div');
-      recentLabel.style.cssText = 'font-size:10px;color:var(--text-faint);margin-bottom:2px;';
+      const recentLabel = document.createElement('span');
+      recentLabel.style.cssText = 'font-size:10px;color:var(--text-faint);flex-shrink:0;';
       recentLabel.textContent = t('recentSearch');
       recentSection.appendChild(recentLabel);
 
-      const recentItems = document.createElement('div');
-      recentItems.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
-
-      const searchesToShow = this._recentSearches.slice(0, 10);
+      const searchesToShow = this._recentSearches.slice(0, 20);
       for (const term of searchesToShow) {
-        const chip = document.createElement('span');
-        chip.className = 'minimap-match-list-recent-chip';
         const isCurrentSearch = term === searchText;
-        chip.style.cssText = `font-size:11px;padding:1px 6px;border-radius:8px;cursor:pointer;border:1px solid ${isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};background:${isCurrentSearch ? 'var(--interactive-accent)' : 'var(--background-secondary)'};color:${isCurrentSearch ? 'var(--text-on-accent)' : 'var(--text-muted)'};white-space:nowrap;transition:background 0.15s,color 0.15s;display:inline-flex;align-items:center;gap:3px;`;
-        chip.textContent = term;
-
-        // Add pin/float button
-        const chipPin = document.createElement('span');
-        const isAlreadyFloating = this._floatingKeywordButtons.some(b => b.term === term);
-        chipPin.textContent = '📌';
-        chipPin.style.cssText = `font-size:9px;cursor:pointer;opacity:${isAlreadyFloating ? '1' : '0.3'};transition:opacity 0.15s;line-height:1;flex-shrink:0;`;
-        chipPin.title = isAlreadyFloating ? t('removeFloat') : t('floatThisWord');
-        chipPin.addEventListener('mousedown', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          this.isInteractingWithList = true;
-        });
-        chipPin.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          const isFloating = this._floatingKeywordButtons.some(b => b.term === term);
-          if (isFloating) {
-            this.removeFloatingKeywordButton(term);
-            chipPin.style.opacity = '0.3';
-            chipPin.title = t('floatThisWord');
-          } else {
-            const cached = this._recentSearchCaches[term];
-            if (cached && cached.fileMap && cached.fileMap.size > 0) {
-              this.createFloatingKeywordButton(term, cached.fileMap, cached.matchCount);
-            } else {
-              this.createFloatingKeywordButton(term, new Map(), 0);
-            }
-            chipPin.style.opacity = '1';
-            chipPin.title = t('removeFloat');
-          }
-        });
-        chip.appendChild(chipPin);
-
-        chip.addEventListener('mousedown', (e) => {
-          if (e.target === chipPin) return;
-          e.stopPropagation();
-          this.isInteractingWithList = true;
-          if (e.button === 1) {
-            e.preventDefault();
-            const idx = this._recentSearches.indexOf(term);
-            if (idx >= 0) this._recentSearches.splice(idx, 1);
-            delete this._recentSearchCaches[term];
-            this.saveListData();
-            chip.remove();
-          }
-        });
-        chip.addEventListener('click', (e) => {
-          if (e.target === chipPin) return;
-          e.stopPropagation();
-          this.isInteractingWithList = true;
-          // Keep list visible during search transition
-          this._keepListVisible = true;
-          this.currentSelection = term;
-          this._listUserDismissed = false;
-          this._exhaustiveSearchDone = false;
-          // Try to use cached results for instant display
-          const cached = this._recentSearchCaches[term];
-          if (cached && cached.fileMap && cached.fileMap.size > 0) {
-            this._cachedMatchList = cached.fileMap;
-            this._cachedMatchListKey = term;
-            this._pendingMatchCount = cached.matchCount;
-            this._pendingSearchText = term;
-            this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
-            // Highlight in current document
-            this.highlightMatches();
-            // Render cached match list
-            this.renderMatchList(cached.fileMap, cached.matchCount, false);
-            this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
-          } else {
-            this.highlightMatches();
-          }
-          this._keepListVisible = false;
-        });
-        chip.addEventListener('mouseenter', () => {
-          if (!isCurrentSearch) {
-            chip.style.background = 'var(--background-modifier-hover)';
-            chip.style.color = 'var(--text-normal)';
-          }
-        });
-        chip.addEventListener('mouseleave', () => {
-          if (!isCurrentSearch) {
-            chip.style.background = 'var(--background-secondary)';
-            chip.style.color = 'var(--text-muted)';
-          }
-        });
-        recentItems.appendChild(chip);
+        const chip = this._createSearchChip(term, { isCurrentSearch, searchText });
+        recentSection.appendChild(chip);
       }
-      recentSection.appendChild(recentItems);
       this.matchList.appendChild(recentSection);
 
       const newContainer = document.createElement('div');
@@ -5360,6 +5400,11 @@ class MinimapPlugin extends Plugin {
           if (isTruncated) {
             let currentStart = snippetInfo.truncateStart;
             let currentEnd = snippetInfo.truncateEnd;
+            const snippetKey = `${file.path}:${item.text}:${entryIdx}`;
+            if (this._expandedSnippets?.[snippetKey]) {
+              currentStart = 0;
+              currentEnd = snippetInfo.fullLine.length;
+            }
 
             const renderSnippet = () => {
               textEl.innerHTML = '';
@@ -5371,7 +5416,9 @@ class MinimapPlugin extends Plugin {
                 leftBtn.addEventListener('click', (ce) => {
                   ce.preventDefault();
                   ce.stopPropagation();
-                  currentStart = Math.max(0, currentStart - 30);
+                  currentStart = 0;
+                  if (!this._expandedSnippets) this._expandedSnippets = {};
+                  this._expandedSnippets[snippetKey] = true;
                   renderSnippet();
                 });
                 textEl.appendChild(leftBtn);
@@ -5398,7 +5445,9 @@ class MinimapPlugin extends Plugin {
                 rightBtn.addEventListener('click', (ce) => {
                   ce.preventDefault();
                   ce.stopPropagation();
-                  currentEnd = Math.min(snippetInfo.fullLine.length, currentEnd + 30);
+                  currentEnd = snippetInfo.fullLine.length;
+                  if (!this._expandedSnippets) this._expandedSnippets = {};
+                  this._expandedSnippets[snippetKey] = true;
                   renderSnippet();
                 });
                 textEl.appendChild(rightBtn);
@@ -5452,17 +5501,19 @@ class MinimapPlugin extends Plugin {
           openBtn.addEventListener('click', async (ce) => {
             ce.preventDefault();
             ce.stopPropagation();
+            const selectedText = textEl && window.getSelection() && textEl.contains(window.getSelection().anchorNode) ? window.getSelection().toString().trim() : '';
             this.closePreview();
             this.hideMatchList();
-            const jumpSearchText = searchText;
-            console.log('[SwiftMatch] openDoc clicked', { file: file?.path, level: item.level, type: item.type, text: item.text, jumpSearchText });
+            const jumpSearchText = selectedText || searchText;
+            console.log('[SwiftMatch] openDoc clicked', { file: file?.path, level: item.level, type: item.type, text: item.text, jumpSearchText, selectedText });
             if (item.level > 0 && item.text) {
               const leaf = await this.openFileInNewTabWithHeading(file, item.text, true);
               console.log('[SwiftMatch] openFileInNewTabWithHeading done, leaf:', leaf);
               setTimeout(() => {
                 console.log('[SwiftMatch] heading branch setTimeout fired');
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
-              }, 2500);
+                if (selectedText) this.jumpToSearchTextInEditor(selectedText);
+              }, 1250);
             } else if (item.type === 'tag') {
               const leaf = await this.openFileInNewTab(file, true);
               console.log('[SwiftMatch] openFileInNewTab done (tag), leaf:', leaf);
@@ -5471,10 +5522,10 @@ class MinimapPlugin extends Plugin {
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 this.jumpToTagInEditor(item.text);
                 this._releaseRememberCursor(file);
-              }, 2500);
+              }, 1250);
             } else {
               const firstSentence = this.getFirstSentence(entry.text);
-              const jumpText = firstSentence || searchText;
+              const jumpText = selectedText || firstSentence || searchText;
               const leaf = await this.openFileInNewTab(file, true);
               console.log('[SwiftMatch] openFileInNewTab done (else), leaf:', leaf, 'jumpText:', jumpText);
               setTimeout(() => {
@@ -5483,7 +5534,7 @@ class MinimapPlugin extends Plugin {
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 if (jumpText) this.jumpToSearchTextInEditor(jumpText);
                 this._releaseRememberCursor(file);
-              }, 2500);
+              }, 1250);
             }
           });
           openBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.isInteractingWithList = true; });
@@ -5596,6 +5647,50 @@ class MinimapPlugin extends Plugin {
         this.matchList.style.top = `${this.listFixedPosition.top}px`;
       }
     }
+
+    if (searchText) {
+      setTimeout(() => { this._highlightSearchTermInList(searchText); }, 100);
+    }
+  }
+
+  _highlightSearchTermInList(searchText) {
+    if (!this.matchList || !searchText) return;
+    const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const textEls = this.matchList.querySelectorAll('.swift-match-card-text');
+    textEls.forEach(el => {
+      this._highlightInElement(el, regex);
+    });
+  }
+
+  _highlightInElement(el, regex) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let node;
+    while (node = walker.nextNode()) {
+      if (regex.test(node.textContent)) {
+        textNodes.push(node);
+      }
+      regex.lastIndex = 0;
+    }
+    for (const textNode of textNodes) {
+      const text = textNode.textContent;
+      const parts = text.split(regex);
+      if (parts.length <= 1) continue;
+      const frag = document.createDocumentFragment();
+      for (const part of parts) {
+        if (regex.test(part)) {
+          const mark = document.createElement('mark');
+          mark.textContent = part;
+          mark.style.cssText = 'background:#ff660044;color:inherit;border-radius:2px;padding:0 1px;';
+          frag.appendChild(mark);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+        regex.lastIndex = 0;
+      }
+      textNode.parentNode.replaceChild(frag, textNode);
+    }
   }
 
   _suppressRememberCursor(file) {
@@ -5627,7 +5722,7 @@ class MinimapPlugin extends Plugin {
       this.app.workspace.setActiveLeaf(leaf, { focus: true });
       this.jumpToHeadingInEditor(heading);
       this._releaseRememberCursor(file);
-    }, 2500);
+    }, 1250);
     
     if (!setActive && currentLeaf) {
       this.app.workspace.setActiveLeaf(currentLeaf, { focus: true });
@@ -7034,8 +7129,12 @@ class MinimapPlugin extends Plugin {
           this._listScrollPositions[currentTerm] = listContainer.scrollTop;
         }
         this._matchListScrollTop = listContainer.scrollTop;
-        this.saveListData();
       }
+      const favSection = this.matchList.querySelector('.swift-match-favorites-section');
+      if (favSection) {
+        this._favSectionScrollTop = favSection.scrollTop;
+      }
+      this.saveListData();
       this.matchList.style.display = 'none';
     }
     if (this._matchListPositionUpdater) {
@@ -7056,6 +7155,9 @@ class MinimapPlugin extends Plugin {
     // Don't clear _listPinnedSearchText - pin persists even when list is hidden
     this.listFixedPosition.left = null;
     this.listFixedPosition.top = null;
+    if (this.floatingSearchBox) {
+      this.floatingSearchBox.value = '';
+    }
   }
 
   addEditorDecorations(cm, matchLines, totalMatches) {
