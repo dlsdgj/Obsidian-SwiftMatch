@@ -4809,10 +4809,26 @@ class MinimapPlugin extends Plugin {
     this._listUserDismissed = false;
     this._exhaustiveSearchDone = false;
     this._listTriggerElement = this.floatingToggleWrapper || null;
-    // Prefer saved list state (preserves scroll position after open-doc click)
-    const restoreTerm = this._lastListSearchTerm || this._pendingSearchText;
-    const restoreFileMap = this._lastListFileMap || this._cachedMatchList;
-    const restoreMatchCount = this._lastListMatchCount || this._pendingMatchCount;
+    const pendingTerm = this._pendingSearchText;
+    let restoreTerm, restoreFileMap, restoreMatchCount;
+    if (pendingTerm && pendingTerm !== this._lastListSearchTerm) {
+      restoreTerm = pendingTerm;
+      const memCached = this._recentSearchCaches[pendingTerm];
+      if (memCached && memCached.fileMap && memCached.fileMap.size > 0) {
+        restoreFileMap = memCached.fileMap;
+        restoreMatchCount = memCached.matchCount || this._pendingMatchCount;
+      } else if (this._cachedMatchListKey === pendingTerm && this._cachedMatchList) {
+        restoreFileMap = this._cachedMatchList;
+        restoreMatchCount = this._pendingMatchCount;
+      } else {
+        restoreFileMap = this._lastListFileMap || this._cachedMatchList;
+        restoreMatchCount = this._lastListMatchCount || this._pendingMatchCount;
+      }
+    } else {
+      restoreTerm = this._lastListSearchTerm || pendingTerm;
+      restoreFileMap = this._lastListFileMap || this._cachedMatchList;
+      restoreMatchCount = this._lastListMatchCount || this._pendingMatchCount;
+    }
 
     if (!restoreFileMap || !restoreTerm) return;
     this._pendingShowList = { searchText: restoreTerm, matchCount: restoreMatchCount };
@@ -5150,6 +5166,7 @@ class MinimapPlugin extends Plugin {
 
     // When list is pinned to a specific search text
     if (this._listPinnedSearchText && this._listPinnedSearchText !== searchText) {
+      this._pendingShowList = { searchText, matchCount };
       if (this.settings.exhaustiveMode) {
         this.performExhaustiveSearch(searchText, matchCount, null);
       } else {
@@ -5163,6 +5180,7 @@ class MinimapPlugin extends Plugin {
 
     // In exhaustive mode, skip heading cache and use full-text search directly
     if (this.settings.exhaustiveMode) {
+      this._pendingShowList = { searchText, matchCount };
       if (!this._exhaustiveSearchDone) {
         this._exhaustiveSearchDone = true;
         this.performExhaustiveSearch(searchText, matchCount, null);

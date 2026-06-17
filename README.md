@@ -30,6 +30,14 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.0 (2026-06-17)</summary>
+
+- **Selection Match Window Fix / 选中关键词匹配窗口修复** — Fixed bug where hovering the floating toggle after selecting new text would show the previous keyword instead of the current selection; now correctly prioritizes the active search term over the last-displayed term / 修复选中新关键词后悬停悬浮按钮仍显示旧关键词的问题；现在正确优先使用当前搜索词而非上次显示的词
+- **Pinned List State Sync / 固定列表状态同步** — `_pendingShowList` now updates even when the list is pinned or in exhaustive mode, preventing stale display after keyword switch / 列表固定或全库搜索模式下切换关键词时也同步更新 `_pendingShowList`，避免显示过期内容
+
+</details>
+
+<details>
 <summary>v1.3.9 (2026-06-17)</summary>
 
 - **Keyword Switching Fix / 关键词切换修复** — Fixed race condition where switching keywords via recent search chips would jump back to the previous keyword; added generation-based search cancellation to fully discard stale async results / 修复点击最近搜索关键词后跳回上一个关键词的竞态问题；用搜索代次机制彻底废弃旧异步搜索结果

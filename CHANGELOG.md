@@ -1,6 +1,11 @@
 # Changelog
 
-## 🆕 v1.3.9 (2026-06-17)
+## 🆕 v1.4.0 (2026-06-17)
+
+- **Selection Match Window Fix** — Fixed bug where hovering the floating toggle after selecting new text would show the previous keyword instead of the current selection; now correctly prioritizes the active search term over the last-displayed term
+- **Pinned List State Sync** — `_pendingShowList` now updates even when the list is pinned or in exhaustive mode, preventing stale display after keyword switch
+
+## v1.3.9 (2026-06-17)
 
 - **Keyword Switching Fix** — Fixed race condition where switching keywords via recent search chips would jump back to the previous keyword; added generation-based search cancellation to fully discard stale async results
 - **Immediate Switch for Uncached Keywords** — Clicking a keyword without cache now immediately shows a searching state and starts incremental result rendering
