@@ -1,6 +1,17 @@
 # Changelog
 
-## 🆕 v1.3.8 (2026-06-17)
+## 🆕 v1.3.9 (2026-06-17)
+
+- **Keyword Switching Fix** — Fixed race condition where switching keywords via recent search chips would jump back to the previous keyword; added generation-based search cancellation to fully discard stale async results
+- **Immediate Switch for Uncached Keywords** — Clicking a keyword without cache now immediately shows a searching state and starts incremental result rendering
+- **Disk Cache Loading on Restart** — Chip clicks and showMatchList now load cached results from disk when memory cache is empty after restart
+- **Cancel Search on Switch** — Switching keywords or hitting cache now immediately cancels any in-progress background search
+- **No Reorder on Chip Click** — Clicking a recent search keyword no longer moves it to the top of the list; new keywords are still added normally
+- **Scroll Position Cleanup** — Deleting a search keyword now also removes its saved scroll position; persistence and loading filter out stale entries
+- **Remove Console Logs** — Removed all console.log/time/timeEnd calls; kept console.error for error reporting
+- **Expandable Match Entries** — Each document now shows match count in header; default shows 3 entries with expand/collapse toggle; snippet limit raised from 3 to 30
+
+## v1.3.8 (2026-06-17)
 
 - **Multi-Style Support** — Floating edit panel now supports multiple custom CSS styles with auto-parsed class previews; click to select default style
 - **Style Persistence** — Custom styles saved to data.json, preserving user styles across plugin updates

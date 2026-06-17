@@ -391,11 +391,13 @@ class MinimapPlugin extends Plugin {
     this._listCloseHandler = null;
     this._pendingListClose = false;
     this.previewSourceLeaf = null;
-    this._searchCancelled = false;
+    this._searchGeneration = 0;
     this._searchInProgress = false;
+
     this._isListVisible = false;
     this._listUserDismissed = false;
     this._keepListVisible = false;
+    this._chipSwitching = false;
     this._listPinnedSearchText = null;
     this._pinnedWordFileMap = null;
     this._pinnedWordMatchCount = 0;
@@ -435,10 +437,14 @@ class MinimapPlugin extends Plugin {
     this._lastMouseX = 0;
     this._lastMouseY = 0;
     this._recentSearches = [];
-    this._recentSearchCaches = {}; // { term: { fileMap, matchCount } }
+    this._recentSearchCaches = {};
+    this._expandedGroups = {};
     this._recentSearchCachesData = []; // deprecated, kept for migration
     this._favoriteSearches = [];
     this._listScrollPositions = {}; // { term: scrollTop }
+    this._lastListSearchTerm = null; // search term used when list was last visible
+    this._lastListFileMap = null; // fileMap when list was last visible
+    this._lastListMatchCount = 0; // matchCount when list was last visible
     this._floatingKeywordButtons = []; // [{ wrapper, term, fileMap, matchCount, position }]
     this._floatingKeywordsData = []; // deprecated, kept for migration
     this._listTriggerElement = null; // element that triggered the list display (keyword btn or floating toggle)
@@ -514,7 +520,11 @@ class MinimapPlugin extends Plugin {
         this._matchListScrollTop = data.matchListScrollTop || 0;
         this._recentSearches = data.recentSearches || [];
         this._favoriteSearches = data.favoriteSearches || [];
-        this._listScrollPositions = data.listScrollPositions || {};
+        this._listScrollPositions = Object.fromEntries(
+          Object.entries(data.listScrollPositions || {}).filter(([k]) =>
+            this._favoriteSearches.includes(k) || this._recentSearches.includes(k)
+          )
+        );
       }
     } catch (e) {
       console.error('Failed to load list data:', e);
@@ -632,7 +642,11 @@ class MinimapPlugin extends Plugin {
         matchListScrollTop: this._matchListScrollTop || 0,
         recentSearches: this._recentSearches || [],
         favoriteSearches: this._favoriteSearches || [],
-        listScrollPositions: this._listScrollPositions || {}
+        listScrollPositions: Object.fromEntries(
+          Object.entries(this._listScrollPositions || {}).filter(([k]) =>
+            this._favoriteSearches.includes(k) || this._recentSearches.includes(k)
+          )
+        )
       };
       await adapter.write(this.listDataPath, JSON.stringify(data, null, 2));
 
@@ -823,7 +837,6 @@ class MinimapPlugin extends Plugin {
       }
     }
   }
-
 
   showSettingsPanel(e) {
     e.preventDefault();
@@ -1750,7 +1763,6 @@ class MinimapPlugin extends Plugin {
       this.floatingToggle.style.opacity = '1';
       this.floatingToggleWrapper.style.zIndex = '100000';
 
-
       this._floatingToggleHoverTimer = setTimeout(() => {
         this._listUserDismissed = false;
         this._listTriggerElement = this.floatingToggleWrapper || null;
@@ -1794,7 +1806,6 @@ class MinimapPlugin extends Plugin {
       const op = this.settings.floatingToggleOpacity || 0.6;
       this.floatingToggle.style.opacity = op.toString();
       this.floatingToggleWrapper.style.zIndex = '99999';
-
 
       if (this._floatingToggleHoverTimer) {
         clearTimeout(this._floatingToggleHoverTimer);
@@ -3323,7 +3334,7 @@ class MinimapPlugin extends Plugin {
       const savedItem = this.savedMatchLists.find(item => item.selection === selection && item.pinned);
       if (!savedItem) return;
 
-      this._searchCancelled = true;
+      this._searchGeneration++;
       this._triggeredByIndicator = true;
       
       const targetRect = target.getBoundingClientRect();
@@ -3683,7 +3694,7 @@ class MinimapPlugin extends Plugin {
         scrollEl.scrollTop += direction * scrollAmount;
       } else {
     const editor = this.getEditor();
-    console.log('[SwiftMatch] heading editor mode, editor:', editor, 'editor.cm:', editor?.cm);
+
     if (!editor || !editor.cm) return;
         
         const cm = editor.cm;
@@ -4246,6 +4257,9 @@ class MinimapPlugin extends Plugin {
       const sel = window.getSelection();
       const selectionText = sel ? sel.toString().trim() : '';
       if (selectionText.length > 0) {
+        if (this._chipSwitching && selectionText === this.currentSelection) return;
+        this._chipSwitching = false;
+        clearTimeout(this._chipSwitchTimer);
         if (this.currentSelection !== selectionText) this._listUserDismissed = false;
         this.currentSelection = selectionText;
         this.currentCursor = null;
@@ -4254,6 +4268,7 @@ class MinimapPlugin extends Plugin {
       } else if (this._isApplyingReadingHighlights) {
         return;
       } else {
+        if (this._chipSwitching) return;
         this.currentSelection = '';
         this.hidePinIcon();
         this.clearHighlights();
@@ -4266,12 +4281,16 @@ class MinimapPlugin extends Plugin {
 
       const selection = editor.getSelection();
       if (selection && selection.trim().length > 0) {
+        if (this._chipSwitching && selection.trim() === this.currentSelection) return;
+        this._chipSwitching = false;
+        clearTimeout(this._chipSwitchTimer);
         if (this.currentSelection !== selection.trim()) this._listUserDismissed = false;
         this.currentSelection = selection.trim();
         this.currentCursor = editor.getCursor();
         this.highlightMatches();
         this.showPinIcon();
       } else {
+        if (this._chipSwitching) return;
         this.currentSelection = '';
         this.hidePinIcon();
         this.clearHighlights();
@@ -4713,12 +4732,8 @@ class MinimapPlugin extends Plugin {
       return;
     }
 
-    if (this._searchInProgress) {
-      this._searchCancelled = true;
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-
-    this._searchCancelled = false;
+    this._searchGeneration++;
+    const gen = this._searchGeneration;
     this._searchInProgress = true;
 
     const allFiles = this.app.vault.getMarkdownFiles();
@@ -4728,10 +4743,7 @@ class MinimapPlugin extends Plugin {
     let totalAllDocMatches = 0;
     
     for (const file of allFiles) {
-      if (this._searchCancelled) {
-        this._searchInProgress = false;
-        return;
-      }
+      if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
       if (file.name.toLowerCase().includes(searchLower)) {
         fileMap.set(file, [{ text: file.basename, level: 0, type: 'content' }]);
         totalAllDocMatches += file.name.toLowerCase().split(searchLower).length - 1;
@@ -4742,18 +4754,16 @@ class MinimapPlugin extends Plugin {
     const remainingFiles = allFiles.filter(f => !fileMap.has(f));
     
     for (const file of remainingFiles) {
-        if (this._searchCancelled) {
-          this._searchInProgress = false;
-          return;
-        }
+        if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
         if (fileMap.size >= 50) break;
         
         try {
           const content = await this.app.vault.cachedRead(file);
+          if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
           if (content && content.toLowerCase().includes(searchLower)) {
             const lines = content.split('\n');
             const snippets = [];
-            for (let i = 0; i < lines.length && snippets.length < 3; i++) {
+            for (let i = 0; i < lines.length && snippets.length < 30; i++) {
               const lineLower = lines[i].toLowerCase();
               const idx = lineLower.indexOf(searchLower);
               if (idx !== -1) {
@@ -4785,12 +4795,11 @@ class MinimapPlugin extends Plugin {
         }
       }
 
-
+    if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
     this._searchInProgress = false;
     this._cachedMatchList = fileMap;
     this._cachedMatchListKey = cacheKey;
     this._pendingMatchCount = totalAllDocMatches;
-    // Cache for recent search reuse
     if (cacheKey && fileMap && fileMap.size > 0) {
       this._recentSearchCaches[cacheKey] = { fileMap, matchCount: totalAllDocMatches };
     }
@@ -4800,9 +4809,14 @@ class MinimapPlugin extends Plugin {
     this._listUserDismissed = false;
     this._exhaustiveSearchDone = false;
     this._listTriggerElement = this.floatingToggleWrapper || null;
-    if (!this._cachedMatchList || !this._pendingSearchText) return;
-    this._pendingShowList = { searchText: this._pendingSearchText, matchCount: this._pendingMatchCount };
-    this.renderMatchList(this._cachedMatchList, this._pendingMatchCount, false);
+    // Prefer saved list state (preserves scroll position after open-doc click)
+    const restoreTerm = this._lastListSearchTerm || this._pendingSearchText;
+    const restoreFileMap = this._lastListFileMap || this._cachedMatchList;
+    const restoreMatchCount = this._lastListMatchCount || this._pendingMatchCount;
+
+    if (!restoreFileMap || !restoreTerm) return;
+    this._pendingShowList = { searchText: restoreTerm, matchCount: restoreMatchCount };
+    this.renderMatchList(restoreFileMap, restoreMatchCount, false);
     this._listShownFromHover = true;
     
     // Position the list near the floating toggle
@@ -4921,37 +4935,56 @@ class MinimapPlugin extends Plugin {
           if (favIdx >= 0) this._favoriteSearches.splice(favIdx, 1);
           delete this._recentSearchCaches[term];
           this.deleteSearchCache(term);
+          delete this._listScrollPositions[term];
         } else {
           const idx = this._recentSearches.indexOf(term);
           if (idx >= 0) this._recentSearches.splice(idx, 1);
           if (!this._favoriteSearches.includes(term)) {
             delete this._recentSearchCaches[term];
             this.deleteSearchCache(term);
+            delete this._listScrollPositions[term];
           }
         }
         this.saveListData();
         chip.remove();
       }
     });
-    chip.addEventListener('click', (e) => {
+    chip.addEventListener('click', async (e) => {
       if (e.target === chipStar || e.target === chipPin) return;
       e.stopPropagation();
       this.isInteractingWithList = true;
       this._keepListVisible = true;
+      this._chipSwitching = true;
+      clearTimeout(this._chipSwitchTimer);
+      this._chipSwitchTimer = setTimeout(() => { this._chipSwitching = false; }, 5000);
       this.currentSelection = term;
       this._listUserDismissed = false;
       this._exhaustiveSearchDone = false;
-      const cached = this._recentSearchCaches[term];
+      this._pendingSearchText = term;
+      if (this._searchInProgress) this._searchGeneration++;
+      let cached = this._recentSearchCaches[term];
+      if (!cached || !cached.fileMap || cached.fileMap.size === 0) {
+        const diskCache = await this.loadSearchCache(term);
+        if (diskCache && diskCache.fileMap && diskCache.fileMap.size > 0) {
+          cached = diskCache;
+          this._recentSearchCaches[term] = diskCache;
+        }
+      }
       if (cached && cached.fileMap && cached.fileMap.size > 0) {
         this._cachedMatchList = cached.fileMap;
         this._cachedMatchListKey = term;
         this._pendingMatchCount = cached.matchCount;
-        this._pendingSearchText = term;
         this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
         this.highlightMatches();
         this.renderMatchList(cached.fileMap, cached.matchCount, false);
         this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
       } else {
+        this._pendingShowList = { searchText: term, matchCount: 0 };
+        this._cachedMatchList = null;
+        this._cachedMatchListKey = null;
+        this._pendingMatchCount = 0;
+        this.renderMatchList(new Map(), 0, false);
+        this.updateFloatingToggleBadge(0, 0);
         this.highlightMatches();
       }
       this._keepListVisible = false;
@@ -5094,16 +5127,23 @@ class MinimapPlugin extends Plugin {
     this._pendingMatchCount = matchCount;
     this._pendingSearchText = searchText;
 
-    // Record to recent searches
+    // Record to recent searches (skip reorder when switching via chip)
     if (searchText && searchText.length > 0) {
       const idx = this._recentSearches.indexOf(searchText);
-      if (idx >= 0) this._recentSearches.splice(idx, 1);
-      this._recentSearches.unshift(searchText);
+      if (idx >= 0) {
+        if (!this._chipSwitching) {
+          this._recentSearches.splice(idx, 1);
+          this._recentSearches.unshift(searchText);
+        }
+      } else {
+        this._recentSearches.unshift(searchText);
+      }
       if (this._recentSearches.length > 20) {
         const removed = this._recentSearches.pop();
         if (!this._favoriteSearches.includes(removed)) {
           delete this._recentSearchCaches[removed];
           this.deleteSearchCache(removed);
+          delete this._listScrollPositions[removed];
         }
       }
     }
@@ -5142,7 +5182,7 @@ class MinimapPlugin extends Plugin {
         this._cachedMatchListKey = cacheKey;
         this._recentSearchCaches[searchText] = { fileMap, matchCount };
         this.updateFloatingToggleBadge(fileMap.size, matchCount);
-        // If list is already visible, refresh it
+      if (this._searchInProgress) this._searchGeneration++;
         if (this._isListVisible) {
           this.renderMatchList(fileMap, matchCount, false);
         }
@@ -5153,19 +5193,42 @@ class MinimapPlugin extends Plugin {
     if (this._cachedMatchList && this._cachedMatchListKey === cacheKey) {
       this._pendingShowList = { searchText, matchCount };
       this.updateFloatingToggleBadge(this._cachedMatchList.size, matchCount);
-      // If list is already visible, refresh it
+      if (this._searchInProgress) this._searchGeneration++;
       if (this._isListVisible) {
         this.renderMatchList(this._cachedMatchList, matchCount, false);
       }
       return;
     }
 
-    if (this._searchInProgress) {
-      this._searchCancelled = true;
-      await new Promise(resolve => setTimeout(resolve, 50));
+    const memCached = this._recentSearchCaches[searchText];
+    if (memCached && memCached.fileMap && memCached.fileMap.size > 0) {
+      this._cachedMatchList = memCached.fileMap;
+      this._cachedMatchListKey = cacheKey;
+      this._pendingShowList = { searchText, matchCount };
+      this.updateFloatingToggleBadge(memCached.fileMap.size, memCached.matchCount || matchCount);
+      if (this._searchInProgress) this._searchGeneration++;
+      if (this._isListVisible) {
+        this.renderMatchList(memCached.fileMap, memCached.matchCount || matchCount, false);
+      }
+      return;
     }
 
-    this._searchCancelled = false;
+    const diskCache = await this.loadSearchCache(searchText);
+    if (diskCache && diskCache.fileMap && diskCache.fileMap.size > 0) {
+      this._cachedMatchList = diskCache.fileMap;
+      this._cachedMatchListKey = cacheKey;
+      this._recentSearchCaches[searchText] = diskCache;
+      this._pendingShowList = { searchText, matchCount };
+      this.updateFloatingToggleBadge(diskCache.fileMap.size, diskCache.matchCount || matchCount);
+      if (this._searchInProgress) this._searchGeneration++;
+      if (this._isListVisible) {
+        this.renderMatchList(diskCache.fileMap, diskCache.matchCount || matchCount, false);
+      }
+      return;
+    }
+
+    this._searchGeneration++;
+    const gen = this._searchGeneration;
     this._searchInProgress = true;
     this._pendingShowList = { searchText, matchCount };
 
@@ -5176,10 +5239,7 @@ class MinimapPlugin extends Plugin {
     let totalAllDocMatches = 0;
     
     for (const file of allFiles) {
-      if (this._searchCancelled) {
-        this._searchInProgress = false;
-        return;
-      }
+      if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
       if (file.name.toLowerCase().includes(searchLower)) {
         fileMap.set(file, [{ text: file.basename, level: 0, type: 'content' }]);
         totalAllDocMatches += file.name.toLowerCase().split(searchLower).length - 1;
@@ -5187,7 +5247,7 @@ class MinimapPlugin extends Plugin {
       if (fileMap.size >= 50) break;
     }
 
-    if (fileMap.size > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
+    if (fileMap.size > 0 && this._searchGeneration === gen) {
       this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
       if (this._isListVisible) {
         this.renderMatchList(fileMap, matchCount, false);
@@ -5197,16 +5257,14 @@ class MinimapPlugin extends Plugin {
     const remainingFiles = allFiles.filter(f => !fileMap.has(f));
     
     for (const file of remainingFiles) {
-        if (this._searchCancelled) {
-          this._searchInProgress = false;
-          return;
-        }
+        if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
         try {
           const content = await this.app.vault.read(file);
+          if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
           if (content && content.toLowerCase().includes(searchLower)) {
             const lines = content.split('\n');
             const snippets = [];
-            for (let i = 0; i < lines.length && snippets.length < 3; i++) {
+            for (let i = 0; i < lines.length && snippets.length < 30; i++) {
               const lineLower = lines[i].toLowerCase();
               const idx = lineLower.indexOf(searchLower);
               if (idx !== -1) {
@@ -5226,7 +5284,7 @@ class MinimapPlugin extends Plugin {
                 }
               }
             }
-            if (snippets.length > 0 && this._pendingShowList && this._pendingShowList.searchText === searchText) {
+            if (snippets.length > 0 && this._searchGeneration === gen) {
               fileMap.set(file, [{ text: file.basename, level: 0, type: 'content', snippets }]);
               totalAllDocMatches += content.toLowerCase().split(searchLower).length - 1;
               this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
@@ -5243,7 +5301,7 @@ class MinimapPlugin extends Plugin {
         if (fileMap.size >= 50) break;
       }
 
-    if (this._pendingShowList && this._pendingShowList.searchText === searchText) {
+    if (this._searchGeneration === gen) {
       this._cachedMatchList = fileMap;
       this._cachedMatchListKey = cacheKey;
       this._recentSearchCaches[searchText] = { fileMap, matchCount: totalAllDocMatches };
@@ -5311,16 +5369,18 @@ class MinimapPlugin extends Plugin {
   }
 
   cancelSearch() {
-    this._searchCancelled = true;
+    this._searchGeneration++;
   }
 
   async performExhaustiveSearch(searchText, matchCount, headerTextEl) {
+    this._searchGeneration++;
+    const gen = this._searchGeneration;
+    this._searchInProgress = true;
     const fileMap = new Map();
     const searchLower = searchText.toLowerCase();
     let totalAllDocMatches = 0;
 
-    // Helper: extract context snippets around matches
-    const extractSnippets = (content, searchLower, maxSnippets = 3) => {
+    const extractSnippets = (content, searchLower, maxSnippets = 30) => {
       const lines = content.split('\n');
       const snippets = [];
       for (let i = 0; i < lines.length && snippets.length < maxSnippets; i++) {
@@ -5346,7 +5406,6 @@ class MinimapPlugin extends Plugin {
       return snippets;
     };
 
-    // Try Obsidian built-in search API first
     try {
       const searchPlugin = this.app.internalPlugins.plugins['search'];
       if (searchPlugin && searchPlugin.instance) {
@@ -5372,16 +5431,18 @@ class MinimapPlugin extends Plugin {
         }
       }
     } catch (e) {
-      // Fallback to manual search if API fails
     }
 
-    // Fallback: manual full-text search using cachedRead with snippet extraction
+    if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+
     if (fileMap.size === 0) {
       const allFiles = this.app.vault.getMarkdownFiles();
       for (const file of allFiles) {
+        if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
         try {
           const nameMatch = file.name.toLowerCase().includes(searchLower);
           const content = await this.app.vault.cachedRead(file);
+          if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
           const contentMatch = content && content.toLowerCase().includes(searchLower);
           if (nameMatch || contentMatch) {
             const snippets = contentMatch ? extractSnippets(content, searchLower) : [];
@@ -5399,13 +5460,16 @@ class MinimapPlugin extends Plugin {
       }
     }
 
-    // Enhance existing results with snippets if they don't have them
+    if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+
     if (fileMap.size > 0) {
       for (const [file, items] of fileMap) {
+        if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
         const hasContentSnippets = items.some(item => item.type === 'content' && (item.snippet || item.snippets));
         if (!hasContentSnippets) {
           try {
             const content = await this.app.vault.cachedRead(file);
+            if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
             if (content) {
               const snippets = extractSnippets(content, searchLower);
               for (const item of items) {
@@ -5416,13 +5480,13 @@ class MinimapPlugin extends Plugin {
               }
             }
           } catch (e) {
-            // skip
           }
         }
       }
     }
 
-    // Cache results and update badge
+    if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+    this._searchInProgress = false;
     this._cachedMatchList = fileMap;
     this._cachedMatchListKey = searchText;
     this._pendingShowList = { searchText, matchCount };
@@ -5440,7 +5504,47 @@ class MinimapPlugin extends Plugin {
     const searchText = this._pendingShowList?.searchText || '';
 
     if (fileMap.size === 0) {
-      this.matchList.style.display = 'none';
+      if (!append && this._pendingShowList?.searchText) {
+        this.matchList.innerHTML = '';
+        const header = document.createElement('div');
+        header.className = 'minimap-match-list-header';
+        header.addEventListener('mousedown', (e) => {
+          this.isInteractingWithList = true;
+        });
+        const headerText = document.createElement('span');
+        headerText.className = 'minimap-match-list-header-text';
+        headerText.textContent = `⏳ ${this._pendingShowList.searchText}`;
+        header.appendChild(headerText);
+        if (this.floatingSearchBox) {
+          this.floatingSearchBox.placeholder = t('searchPlaceholder');
+          this.floatingSearchBox.style.marginLeft = '8px';
+          header.appendChild(this.floatingSearchBox);
+        }
+        this.matchList.appendChild(header);
+        const favSec = this._createFavoritesSection(this._pendingShowList.searchText);
+        if (favSec) this.matchList.appendChild(favSec);
+        const recentSec = document.createElement('div');
+        recentSec.className = 'minimap-match-list-recent';
+        recentSec.style.cssText = 'padding:4px 8px;border-bottom:1px solid var(--background-modifier-border);max-height:80px;overflow-y:auto;display:flex;flex-wrap:wrap;align-items:center;gap:4px;';
+        const recentLabel = document.createElement('span');
+        recentLabel.style.cssText = 'font-size:10px;color:var(--text-faint);flex-shrink:0;';
+        recentLabel.textContent = t('recentSearch');
+        recentSec.appendChild(recentLabel);
+        const searchesToShow = this._recentSearches.slice(0, 20);
+        for (const rTerm of searchesToShow) {
+          const chip = this._createSearchChip(rTerm, { isCurrentSearch: rTerm === this._pendingShowList.searchText, searchText: this._pendingShowList.searchText });
+          recentSec.appendChild(chip);
+        }
+        this.matchList.appendChild(recentSec);
+        const emptyContainer = document.createElement('div');
+        emptyContainer.className = 'minimap-match-list-container';
+        emptyContainer.style.cssText = 'padding:12px;text-align:center;color:var(--text-faint);font-size:12px;';
+        emptyContainer.textContent = '...';
+        this.matchList.appendChild(emptyContainer);
+        this.matchList.style.display = 'flex';
+      } else {
+        this.matchList.style.display = 'none';
+      }
       return;
     }
 
@@ -5452,11 +5556,11 @@ class MinimapPlugin extends Plugin {
       // Preserve resize handle and scroll position when clearing
       const existingResizeHandle = this.matchList.querySelector('.minimap-match-list-resize-handle');
       const listContainer = this.matchList.querySelector('.minimap-match-list-container');
-      const savedScrollTop = listContainer ? listContainer.scrollTop : 0;
+      // Only save current scrollTop if list is visible (display: none yields scrollTop=0)
+      if (listContainer && this.matchList.style.display !== 'none') {
+        this._savedListScrollTop = listContainer.scrollTop;
+      }
       this.matchList.innerHTML = '';
-
-      // Store scroll position to restore after rebuild
-      this._savedListScrollTop = savedScrollTop;
       
       const header = document.createElement('div');
       header.className = 'minimap-match-list-header';
@@ -5530,6 +5634,14 @@ class MinimapPlugin extends Plugin {
 
       const newContainer = document.createElement('div');
       newContainer.className = 'minimap-match-list-container';
+      // Save scroll position on every scroll event for robust restoration
+      newContainer.addEventListener('scroll', () => {
+        const currentTerm = this._pendingShowList?.searchText || this._pendingSearchText;
+        if (currentTerm) {
+          this._listScrollPositions[currentTerm] = newContainer.scrollTop;
+        }
+        this._matchListScrollTop = newContainer.scrollTop;
+      });
       this.matchList.appendChild(newContainer);
     }
 
@@ -5561,30 +5673,68 @@ class MinimapPlugin extends Plugin {
         ? 'margin-top:8px;padding-top:8px;border-top:1px solid var(--background-modifier-border);'
         : '';
 
-      // 分组标题栏：文件名
+      // 分组标题栏：文件名 + 匹配数量
       const headerEl = document.createElement('div');
-      headerEl.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;';
+      headerEl.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;cursor:pointer;';
 
       const fileNameEl = document.createElement('span');
       fileNameEl.textContent = file.path;
-      fileNameEl.style.cssText = `font-size:12px;font-weight:600;color:${fileNameColor};background:${fileNameBg};padding:2px 8px;border-radius:10px;flex-shrink:0;white-space:nowrap;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;`;
-      fileNameEl.addEventListener('mousedown', (e) => {
+      fileNameEl.style.cssText = `font-size:12px;font-weight:600;color:${fileNameColor};background:${fileNameBg};padding:2px 8px;border-radius:10px;flex-shrink:0;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;`;
+
+      let totalEntries = 0;
+      items.forEach(item => {
+        if (item.type === 'content' && (item.snippet || (item.snippets && item.snippets.length > 0))) {
+          totalEntries += (item.snippets || (item.snippet ? [item.snippet] : [])).length;
+        } else {
+          totalEntries++;
+        }
+      });
+
+      const countEl = document.createElement('span');
+      countEl.textContent = `${totalEntries}`;
+      countEl.style.cssText = `font-size:10px;color:var(--text-faint);background:var(--background-secondary);padding:1px 5px;border-radius:8px;flex-shrink:0;`;
+
+      const expandIcon = document.createElement('span');
+      const isExpanded = this._expandedGroups?.[file.path];
+      expandIcon.textContent = isExpanded ? '▼' : '▶';
+      expandIcon.style.cssText = 'font-size:8px;color:var(--text-faint);flex-shrink:0;transition:transform 0.15s;';
+
+      headerEl.appendChild(expandIcon);
+      headerEl.appendChild(fileNameEl);
+      headerEl.appendChild(countEl);
+
+      headerEl.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         e.preventDefault();
         this.isInteractingWithList = true;
-        if (e.button === 0 || e.button === 1) {
-          this.closePreview();
-          this.hideMatchList();
-          this.openFileInNewTab(file, true);
-        }
       });
-      headerEl.appendChild(fileNameEl);
+      headerEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!this._expandedGroups) this._expandedGroups = {};
+        this._expandedGroups[file.path] = !this._expandedGroups[file.path];
+        expandIcon.textContent = this._expandedGroups[file.path] ? '▼' : '▶';
+          const allItems = bodyEl.querySelectorAll('.swift-match-item:not(.swift-match-more-line):not(.swift-match-divider)');
+        allItems.forEach((el, idx) => {
+          if (idx >= 3) {
+            el.style.display = this._expandedGroups[file.path] ? 'flex' : 'none';
+          }
+        });
+        const allDividers = bodyEl.querySelectorAll('.swift-match-divider');
+        allDividers.forEach((el, idx) => {
+          if (idx >= 2) {
+            el.style.display = this._expandedGroups[file.path] ? 'block' : 'none';
+          }
+        });
+        const moreLine = bodyEl.querySelector('.swift-match-more-line');
+        if (moreLine) moreLine.style.display = this._expandedGroups[file.path] ? 'none' : 'flex';
+      });
       groupEl.appendChild(headerEl);
 
       // 分组内容区
       const bodyEl = document.createElement('div');
       bodyEl.className = 'swift-match-group-body';
 
+      let globalEntryIdx = 0;
       items.forEach((item, i) => {
         // 将 content 类型的 snippets 拆分为独立条目
         let matchEntries = [];
@@ -5606,20 +5756,21 @@ class MinimapPlugin extends Plugin {
         }
 
         matchEntries.forEach((entry, entryIdx) => {
-          // 同一组内多条匹配用横线隔开
-          if (i > 0 || entryIdx > 0) {
-            const prevEntry = entryIdx === 0 ? null : matchEntries[entryIdx - 1];
-            // 如果是第一条（i=0且entryIdx=0）不加分隔线
-            if (!(i === 0 && entryIdx === 0)) {
-              const innerDivider = document.createElement('div');
-              innerDivider.style.cssText = 'border-top:1px solid var(--background-modifier-border);margin:4px 0;';
-              bodyEl.appendChild(innerDivider);
-            }
+          const entryIdxInGroup = globalEntryIdx++;
+
+          if (entryIdxInGroup > 0) {
+            const innerDivider = document.createElement('div');
+            innerDivider.className = 'swift-match-item swift-match-divider';
+            innerDivider.style.cssText = 'border-top:1px solid var(--background-modifier-border);margin:4px 0;';
+            if (entryIdxInGroup >= 3 && !isExpanded) innerDivider.style.display = 'none';
+            bodyEl.appendChild(innerDivider);
           }
 
           // 圆点 + 文本内容
           const itemWrapper = document.createElement('div');
+          itemWrapper.className = 'swift-match-item';
           itemWrapper.style.cssText = 'display:flex;align-items:flex-start;gap:6px;';
+          if (entryIdxInGroup >= 3 && !isExpanded) itemWrapper.style.display = 'none';
 
           const dot = document.createElement('span');
           dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:5px;`;
@@ -5746,20 +5897,20 @@ class MinimapPlugin extends Plugin {
             this.closePreview();
             this.hideMatchList();
             const jumpSearchText = selectedText || searchText;
-            console.log('[SwiftMatch] openDoc clicked', { file: file?.path, level: item.level, type: item.type, text: item.text, jumpSearchText, selectedText });
+
             if (item.level > 0 && item.text) {
               const leaf = await this.openFileInNewTabWithHeading(file, item.text, true);
-              console.log('[SwiftMatch] openFileInNewTabWithHeading done, leaf:', leaf);
+
               setTimeout(() => {
-                console.log('[SwiftMatch] heading branch setTimeout fired');
+
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 if (selectedText) this.jumpToSearchTextInEditor(selectedText);
               }, 1250);
             } else if (item.type === 'tag') {
               const leaf = await this.openFileInNewTab(file, true);
-              console.log('[SwiftMatch] openFileInNewTab done (tag), leaf:', leaf);
+
               setTimeout(() => {
-                console.log('[SwiftMatch] tag branch setTimeout fired');
+
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 this.jumpToTagInEditor(item.text);
                 this._releaseRememberCursor(file);
@@ -5768,10 +5919,10 @@ class MinimapPlugin extends Plugin {
               const firstSentence = this.getFirstSentence(entry.text);
               const jumpText = selectedText || firstSentence || searchText;
               const leaf = await this.openFileInNewTab(file, true);
-              console.log('[SwiftMatch] openFileInNewTab done (else), leaf:', leaf, 'jumpText:', jumpText);
+
               setTimeout(() => {
-                console.log('[SwiftMatch] else branch setTimeout fired, activeLeaf:', this.app.workspace.activeLeaf?.view?.file?.path);
-                console.log('[SwiftMatch] getEditor:', this.getEditor(), 'isReadingMode:', this.isReadingMode());
+
+
                 this.app.workspace.setActiveLeaf(leaf, { focus: true });
                 if (jumpText) this.jumpToSearchTextInEditor(jumpText);
                 this._releaseRememberCursor(file);
@@ -5781,12 +5932,41 @@ class MinimapPlugin extends Plugin {
           openBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.isInteractingWithList = true; });
           toolBar.appendChild(openBtn);
 
-
           itemBox.appendChild(toolBar);
           itemWrapper.appendChild(itemBox);
           bodyEl.appendChild(itemWrapper);
         }); // end matchEntries.forEach
       }); // end items.forEach
+
+      if (totalEntries > 3) {
+        const moreLine = document.createElement('div');
+        moreLine.className = 'swift-match-item swift-match-more-line';
+        moreLine.style.cssText = `display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer;`;
+        if (isExpanded) moreLine.style.display = 'none';
+        const moreDot = document.createElement('span');
+        moreDot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;opacity:0.5;`;
+        moreLine.appendChild(moreDot);
+        const moreText = document.createElement('span');
+        moreText.style.cssText = 'font-size:11px;color:var(--text-faint);';
+        moreText.textContent = `+${totalEntries - 3} ...`;
+        moreLine.appendChild(moreText);
+        moreLine.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!this._expandedGroups) this._expandedGroups = {};
+          this._expandedGroups[file.path] = true;
+          expandIcon.textContent = '▼';
+          const allItems = bodyEl.querySelectorAll('.swift-match-item:not(.swift-match-more-line):not(.swift-match-divider)');
+          allItems.forEach((el) => {
+            el.style.display = 'flex';
+          });
+          const allDividers = bodyEl.querySelectorAll('.swift-match-divider');
+          allDividers.forEach((el) => {
+            el.style.display = 'block';
+          });
+          moreLine.style.display = 'none';
+        });
+        bodyEl.appendChild(moreLine);
+      }
 
       groupEl.appendChild(bodyEl);
       listContainer.appendChild(groupEl);
@@ -5818,17 +5998,18 @@ class MinimapPlugin extends Plugin {
       const searchRowHeight = searchRow ? searchRow.offsetHeight : 0;
       const containerMaxHeight = maxSavedHeight - headerHeight - recentHeight - 40;
       sizeListContainer.style.maxHeight = `${Math.max(50, containerMaxHeight)}px`;
+      const termScrollPos = searchText ? (this._listScrollPositions[searchText] || 0) : 0;
+      const scrollTopToRestore = this._savedListScrollTop || termScrollPos || this._matchListScrollTop;
+
+      if (scrollTopToRestore) {
+        this._restoreListScrollTop(sizeListContainer, scrollTopToRestore);
+        this._savedListScrollTop = 0;
+        this._matchListScrollTop = 0;
+      }
       requestAnimationFrame(() => {
         const contentHeight = sizeListContainer.scrollHeight;
         const autoHeight = Math.min(contentHeight + headerHeight + recentHeight + 40, maxSavedHeight);
         this.matchList.style.height = `${autoHeight}px`;
-        const termScrollPos = searchText ? (this._listScrollPositions[searchText] || 0) : 0;
-        const scrollTopToRestore = this._savedListScrollTop || termScrollPos || this._matchListScrollTop;
-        if (scrollTopToRestore) {
-          sizeListContainer.scrollTop = scrollTopToRestore;
-          this._savedListScrollTop = 0;
-          this._matchListScrollTop = 0;
-        }
       });
     }
 
@@ -5904,6 +6085,24 @@ class MinimapPlugin extends Plugin {
     });
   }
 
+  _restoreListScrollTop(container, targetScrollTop, retries = 5) {
+    if (!container || !container.isConnected) return;
+
+    const tryRestore = (attempt) => {
+      if (attempt <= 0) return;
+      requestAnimationFrame(() => {
+        if (!container.isConnected) return;
+        container.scrollTop = targetScrollTop;
+
+        // Verify scrollTop was actually set (may fail if content not yet rendered)
+        if (Math.abs(container.scrollTop - targetScrollTop) > 5 && attempt > 1) {
+          setTimeout(() => tryRestore(attempt - 1), 100);
+        }
+      });
+    };
+    tryRestore(retries);
+  }
+
   _highlightInElement(el, regex) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
     const textNodes = [];
@@ -5974,9 +6173,7 @@ class MinimapPlugin extends Plugin {
   async showPreviewWithHeading(file, heading) {
     if (!this.previewPanel) return;
 
-    console.time('showPreviewWithHeading');
     this.cancelSearch();
-    console.timeLog('showPreviewWithHeading', 'cancelSearch done');
 
     const wasPreviewOpen = this.isPreviewOpen;
     
@@ -6008,11 +6205,9 @@ class MinimapPlugin extends Plugin {
     }
     
     try {
-      console.time('readFile');
+
       const content = await this.app.vault.read(file);
-      console.timeEnd('readFile');
-      
-      console.time('buildDOM');
+
       this.previewPanel.innerHTML = '';
       
       const header = document.createElement('div');
@@ -6116,9 +6311,7 @@ class MinimapPlugin extends Plugin {
       this.previewPanel.appendChild(contentDiv);
       this.previewPanel.appendChild(resizeHandle);
       this.previewPanel.style.display = 'flex';
-      console.timeEnd('buildDOM');
-      
-      console.time('renderMarkdown');
+
       try {
         await MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);
         if (!contentDiv.innerHTML || contentDiv.innerHTML.trim() === '') {
@@ -6128,23 +6321,19 @@ class MinimapPlugin extends Plugin {
         console.error('MarkdownRenderer.render failed:', renderError);
         contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
       }
-      console.timeEnd('renderMarkdown');
-      
-      console.time('positioning');
+
       this.positionPreviewPanel();
       this.highlightCurrentPreviewItem();
-      console.timeEnd('positioning');
-      
+
       this.setupPreviewOutsideClick();
       
       setTimeout(() => {
-        console.time('scrollToHeading');
+
         this.scrollToHeadingInPreview(contentDiv, heading);
-        console.timeEnd('scrollToHeading');
+
       }, 100);
       
-      console.timeEnd('showPreviewWithHeading');
-      
+
     } catch (e) {
       console.error('Failed to read file:', e);
       this.closePreview();
@@ -6168,10 +6357,10 @@ class MinimapPlugin extends Plugin {
   }
 
   jumpToHeadingInEditor(heading) {
-    console.log('[SwiftMatch] jumpToHeadingInEditor called, heading:', heading, 'isReadingMode:', this.isReadingMode());
+
     if (this.isReadingMode()) {
       const readingEl = this.getReadingViewContentEl();
-      console.log('[SwiftMatch] heading reading mode, readingEl:', readingEl);
+
       if (!readingEl) return;
       const headingText = heading.toLowerCase().trim();
       const elements = readingEl.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -6546,10 +6735,10 @@ class MinimapPlugin extends Plugin {
   }
 
   jumpToSearchTextInEditor(searchText) {
-    console.log('[SwiftMatch] jumpToSearchTextInEditor called, searchText:', searchText, 'isReadingMode:', this.isReadingMode());
+
     if (this.isReadingMode()) {
       const readingEl = this.getReadingViewContentEl();
-      console.log('[SwiftMatch] reading mode, readingEl:', readingEl);
+
       if (!readingEl) return;
       const searchLower = searchText.toLowerCase();
       const walker = document.createTreeWalker(readingEl, NodeFilter.SHOW_TEXT, null, false);
@@ -6564,7 +6753,7 @@ class MinimapPlugin extends Plugin {
 
           // 临时高亮 hl-marshmallow
           this.highlightJumpTextReading(readingEl, node, idx, searchText.length);
-          console.log('[SwiftMatch] reading mode: found and scrolled to text');
+
           break;
         }
       }
@@ -6572,7 +6761,7 @@ class MinimapPlugin extends Plugin {
     }
 
     const editor = this.getEditor();
-    console.log('[SwiftMatch] editor mode, editor:', editor, 'editor.cm:', editor?.cm);
+
     if (!editor || !editor.cm) return;
 
     const cm = editor.cm;
@@ -6580,11 +6769,10 @@ class MinimapPlugin extends Plugin {
     const searchLower = searchText.toLowerCase();
 
     const fullIdx = content.toLowerCase().indexOf(searchLower);
-    console.log('[SwiftMatch] fullText search, fullIdx:', fullIdx);
+
     if (fullIdx !== -1) {
       const from = fullIdx;
       const to = fullIdx + searchText.length;
-      console.log('[SwiftMatch] editor mode: found at pos', from, 'to', to);
 
       cm.dispatch({
         selection: { anchor: from },
@@ -6605,11 +6793,10 @@ class MinimapPlugin extends Plugin {
       return;
     }
 
-    console.log('[SwiftMatch] fullText not found, trying fallback with jumpSearchText');
     const fallbackText = this.currentSelection;
     if (fallbackText && fallbackText !== searchText) {
       const fallbackIdx = content.toLowerCase().indexOf(fallbackText.toLowerCase());
-      console.log('[SwiftMatch] fallback search for:', fallbackText, 'idx:', fallbackIdx);
+
       if (fallbackIdx !== -1) {
         const from = fallbackIdx;
         const to = fallbackIdx + fallbackText.length;
@@ -6687,9 +6874,7 @@ class MinimapPlugin extends Plugin {
   async showPreview(file) {
     if (!this.previewPanel) return;
 
-    console.time('showPreview');
     this.cancelSearch();
-    console.timeLog('showPreview', 'cancelSearch done');
 
     this.isPreviewOpen = true;
     this.currentPreviewFile = file;
@@ -6707,11 +6892,9 @@ class MinimapPlugin extends Plugin {
     }
     
     try {
-      console.time('readFile');
+
       const content = await this.app.vault.read(file);
-      console.timeEnd('readFile');
-      
-      console.time('buildDOM');
+
       this.previewPanel.innerHTML = '';
       
       const header = document.createElement('div');
@@ -6815,9 +6998,7 @@ class MinimapPlugin extends Plugin {
       this.previewPanel.appendChild(contentDiv);
       this.previewPanel.appendChild(resizeHandle);
       this.previewPanel.style.display = 'flex';
-      console.timeEnd('buildDOM');
-      
-      console.time('renderMarkdown');
+
       try {
         await MarkdownRenderer.render(this.app, content, contentDiv, file.path, this);
         if (!contentDiv.innerHTML || contentDiv.innerHTML.trim() === '') {
@@ -6827,17 +7008,13 @@ class MinimapPlugin extends Plugin {
         console.error('MarkdownRenderer.render failed:', renderError);
         contentDiv.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
       }
-      console.timeEnd('renderMarkdown');
-      
-      console.time('positioning');
+
       this.positionPreviewPanel();
       this.highlightCurrentPreviewItem();
-      console.timeEnd('positioning');
-      
+
       this.setupPreviewOutsideClick();
       
-      console.timeEnd('showPreview');
-      
+
     } catch (e) {
       console.error('Failed to read file:', e);
       this.closePreview();
@@ -7363,13 +7540,27 @@ class MinimapPlugin extends Plugin {
 
   hideMatchList() {
     if (this.matchList) {
+      // Skip if already hidden — avoid overwriting saved scroll position with 0
+      if (this.matchList.style.display === 'none') {
+
+        return;
+      }
       const listContainer = this.matchList.querySelector('.minimap-match-list-container');
       if (listContainer) {
         const currentTerm = this._pendingShowList?.searchText || this._pendingSearchText;
         if (currentTerm) {
           this._listScrollPositions[currentTerm] = listContainer.scrollTop;
+
         }
         this._matchListScrollTop = listContainer.scrollTop;
+      }
+      // Save the list state so it can be restored exactly when reopened
+      const savedTerm = this._pendingShowList?.searchText || this._pendingSearchText;
+      if (savedTerm) {
+        this._lastListSearchTerm = savedTerm;
+        this._lastListFileMap = this._cachedMatchList;
+        this._lastListMatchCount = this._pendingMatchCount;
+
       }
       const favSection = this.matchList.querySelector('.swift-match-favorites-section');
       if (favSection) {
@@ -7389,7 +7580,7 @@ class MinimapPlugin extends Plugin {
     this._pendingListClose = false;
     this._isListVisible = false;
     this._listUserDismissed = true;
-    this._searchCancelled = true;
+    this._searchGeneration++;
     this._pendingShowList = null;
     this._listShownFromHover = false;
     this._listTriggerElement = null;
@@ -7464,7 +7655,6 @@ class MinimapPlugin extends Plugin {
     const counterSize = this.settings.counterSize;
     const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
-
 
     cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
     cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
