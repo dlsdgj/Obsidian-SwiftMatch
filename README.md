@@ -177,3 +177,9 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 </details>
 
 </details>
+
+## Sponsor / 赞助
+
+If you find this plugin helpful, consider buying me a coffee! / 如果这个插件对你有帮助，请考虑支持我！
+
+![Reward](assets/reward.png)
