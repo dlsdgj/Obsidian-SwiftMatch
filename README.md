@@ -30,7 +30,7 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
-<summary>v1.4.1 (2026-06-18)</summary>
+<summary>v1.4.2 (2026-06-18)</summary>
 
 - **Counter Style Presets / 计数样式预设** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings / 新增6种计数badge样式预设（毛玻璃、渐变胶囊、描边气泡、丝带旗帜、圆点指示器），设置面板可选
 - **Counter line-height Fix / 计数行高修复** — Added `line-height:1` to counter `::after` pseudo-elements, fixing vertical padding that couldn't be reduced below a minimum / 计数器`::after`伪元素添加`line-height:1`，修复垂直内边距无法继续缩小的问题

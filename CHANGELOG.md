@@ -1,6 +1,6 @@
 # Changelog
 
-## 🆕 v1.4.1 (2026-06-18)
+## 🆕 v1.4.2 (2026-06-18)
 
 - **Counter Style Presets** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings
 - **Counter line-height Fix** — Added `line-height:1` to counter `::after` pseudo-elements, fixing vertical padding that couldn't be reduced below a minimum
