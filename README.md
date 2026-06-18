@@ -39,6 +39,8 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 - **Require All Keywords / 仅显示包含所有关键词的文档** — New option (default on) to only show documents containing all search keywords / 新增选项（默认开启），仅显示包含所有搜索关键词的文档
 - **Search Loading Indicator / 搜索加载提示** — All search modes now show a "Building..." indicator while searching / 所有搜索模式搜索时显示"正在构建..."提示
 - **Search on Input Toggle / 输入即搜选项** — New option (default off) to require Enter key to trigger search instead of typing / 新增选项（默认关闭），需按Enter才触发搜索而非输入即搜
+- **Background Search on Selection / 选中文字后台搜索** — Selecting text no longer auto-shows the match window; search runs in background and badge updates; click floating toggle to view results / 选中文本不再自动弹出匹配窗口，搜索在后台进行并更新badge；点击悬浮按钮查看结果
+- **Minimap Blacklist for Plugin Pages / minimap黑名单支持插件页面** — Blacklist now matches view titles (e.g. "Thino") and view types for plugin pages without file paths; case-insensitive matching / 黑名单支持通过视图标题（如"Thino"）和视图类型匹配无文件路径的插件页面；大小写不敏感匹配
 
 </details>
 

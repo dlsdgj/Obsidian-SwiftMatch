@@ -9,6 +9,8 @@
 - **Require All Keywords** — New option (default on) to only show documents containing all search keywords
 - **Search Loading Indicator** — All search modes now show a "Building..." indicator while searching
 - **Search on Input Toggle** — New option (default off) to require Enter key to trigger search instead of typing
+- **Background Search on Selection** — Selecting text no longer auto-shows the match window; search runs in background and badge updates; click floating toggle to view results
+- **Minimap Blacklist for Plugin Pages** — Blacklist now matches view titles (e.g. "Thino") and view types for plugin pages without file paths; case-insensitive matching
 
 ## v1.4.0 (2026-06-17)
 

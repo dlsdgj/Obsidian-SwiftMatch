@@ -1326,6 +1326,7 @@ class MinimapPlugin extends Plugin {
       floatingToggleOpacityValue.textContent = this.settings.floatingToggleOpacity.toFixed(2);
       this.saveSettings();
       this.applySettings();
+      this.setupMinimap();
       this.applyCounterStyles();
       this.updateFloatingToggleStyle();
       renderColorSchemes();
@@ -1823,6 +1824,7 @@ class MinimapPlugin extends Plugin {
         if (hasCachedMatches) {
           if (this._listPinnedSearchText && this._pinnedWordFileMap) {
             this._pendingShowList = { searchText: this._listPinnedSearchText, matchCount: this._pinnedWordMatchCount || 0 };
+            this._isListVisible = true;
             this.renderMatchList(this._pinnedWordFileMap, this._pinnedWordMatchCount || 0, false);
             this._listShownFromHover = true;
             this.positionListNearFloatingToggle();
@@ -1838,6 +1840,7 @@ class MinimapPlugin extends Plugin {
             this._cachedMatchListKey = recentTerm;
             this._pendingMatchCount = cached.matchCount;
             this._pendingSearchText = recentTerm;
+            this._isListVisible = true;
             this.renderMatchList(cached.fileMap, cached.matchCount, false);
             this._listShownFromHover = true;
             this.positionListNearFloatingToggle();
@@ -2547,6 +2550,7 @@ class MinimapPlugin extends Plugin {
           this._pendingMatchCount = cached.matchCount;
           this._pendingShowList = { searchText: keyword, matchCount: cached.matchCount };
           this._listTriggerElement = wrapper;
+          this._isListVisible = true;
           this.renderMatchList(cached.fileMap, cached.matchCount, false);
           this._listShownFromHover = true;
           this.positionListNearElement(wrapper);
@@ -3151,33 +3155,113 @@ class MinimapPlugin extends Plugin {
   _isMinimapBlacklisted() {
     const leaf = this.app.workspace.activeLeaf;
     if (!leaf) return false;
+    return this._isLeafBlacklisted(leaf);
+  }
+
+  _isLeafBlacklisted(leaf) {
+    if (!leaf) return false;
     let filePath = leaf.view?.file?.path;
+    let viewTitle = '';
+    let viewType = leaf.view?.viewType || '';
     if (!filePath) {
-      const leafEl = leaf.containerEl || leaf.view?.containerEl;
-      if (leafEl) {
-        const navEl = leafEl.querySelector('.view-header-title');
-        if (navEl) {
-          const name = navEl.textContent?.trim();
-          if (name) {
-            const found = this.app.vault.getFiles().find(f => f.name === name || f.basename === name);
-            if (found) filePath = found.path;
+      // Try getDisplayText() first (most reliable for plugin views)
+      if (leaf.view && typeof leaf.view.getDisplayText === 'function') {
+        viewTitle = leaf.view.getDisplayText()?.trim() || '';
+      }
+      // Fallback to DOM title
+      if (!viewTitle) {
+        const leafEl = leaf.containerEl || leaf.view?.containerEl;
+        if (leafEl) {
+          const navEl = leafEl.querySelector('.view-header-title');
+          if (navEl) {
+            viewTitle = navEl.textContent?.trim() || '';
+          }
+        }
+      }
+      // If title matches a vault file, use its path instead
+      if (viewTitle) {
+        const found = this.app.vault.getFiles().find(f => f.name === viewTitle || f.basename === viewTitle);
+        if (found) filePath = found.path;
+      }
+    }
+    if (!filePath && !viewTitle && !viewType) return false;
+    const blacklist = (this.settings.minimapBlacklist || '').split('\n').map(s => s.trim()).filter(Boolean);
+    for (const pattern of blacklist) {
+      const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'i');
+      if (filePath && regex.test(filePath)) return true;
+      if (viewTitle && regex.test(viewTitle)) return true;
+      if (viewType && regex.test(viewType)) return true;
+    }
+    return false;
+  }
+
+  _getViewInfoFromContainer(containerEl) {
+    // Walk up the DOM to find the leaf that owns this container
+    const leaves = [];
+    this.app.workspace.iterateRootLeaves((leaf) => { leaves.push(leaf); });
+    // Also check sidebar leaves
+    if (this.app.workspace.leftSplit) {
+      const leftLeaves = this.app.workspace.leftSplit.children?.flatMap(s => s.children || []) || [];
+      leaves.push(...leftLeaves);
+    }
+    if (this.app.workspace.rightSplit) {
+      const rightLeaves = this.app.workspace.rightSplit.children?.flatMap(s => s.children || []) || [];
+      leaves.push(...rightLeaves);
+    }
+    for (const leaf of leaves) {
+      if (leaf.view && leaf.view.containerEl && leaf.view.containerEl.contains(containerEl)) {
+        return {
+          filePath: leaf.view.file?.path || '',
+          viewTitle: (typeof leaf.view.getDisplayText === 'function' ? leaf.view.getDisplayText()?.trim() : '') || '',
+          viewType: leaf.view.viewType || ''
+        };
+      }
+    }
+    // Fallback: check DOM for view-header-title
+    const navEl = containerEl.querySelector('.view-header-title');
+    const viewTitle = navEl ? navEl.textContent?.trim() || '' : '';
+    return { filePath: '', viewTitle, viewType: '' };
+  }
+
+  _isViewInfoBlacklisted(info) {
+    const { filePath, viewTitle, viewType } = info;
+    if (!filePath && !viewTitle && !viewType) return false;
+    const blacklist = (this.settings.minimapBlacklist || '').split('\n').map(s => s.trim()).filter(Boolean);
+    for (const pattern of blacklist) {
+      const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'i');
+      if (filePath && regex.test(filePath)) return true;
+      if (viewTitle && regex.test(viewTitle)) return true;
+      if (viewType && regex.test(viewType)) return true;
+    }
+    return false;
+  }
+
+  _cleanupBlacklistedLeaves() {
+    // Remove minimap containers from all blacklisted leaves
+    const leaves = [];
+    this.app.workspace.iterateRootLeaves((leaf) => {
+      leaves.push(leaf);
+    });
+    for (const leaf of leaves) {
+      if (this._isLeafBlacklisted(leaf)) {
+        const containerEl = leaf.view?.containerEl;
+        if (containerEl) {
+          const existing = containerEl.querySelector('.minimap-container');
+          if (existing && existing.parentNode) {
+            existing.parentNode.removeChild(existing);
           }
         }
       }
     }
-    if (!filePath) return false;
-    const blacklist = (this.settings.minimapBlacklist || '').split('\n').map(s => s.trim()).filter(Boolean);
-    for (const pattern of blacklist) {
-      const regex = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
-      if (regex.test(filePath)) return true;
-    }
-    return false;
   }
 
   setupMinimap() {
     const workspace = this.app.workspace;
     const activeLeaf = workspace.activeLeaf;
     if (!activeLeaf) return;
+
+    // Clean up minimap on all blacklisted leaves (handles settings changes)
+    this._cleanupBlacklistedLeaves();
 
     if (this._isMinimapBlacklisted()) {
       this.removeEditorPadding();
@@ -3192,6 +3276,20 @@ class MinimapPlugin extends Plugin {
 
     const editorEl = activeLeaf.view.containerEl;
     if (!editorEl) return;
+
+    // Also check if the containerEl belongs to a blacklisted view
+    // (activeLeaf may not reflect the actual view for plugin pages like Thino)
+    const containerViewInfo = this._getViewInfoFromContainer(editorEl);
+    if (this._isViewInfoBlacklisted(containerViewInfo)) {
+      this.removeEditorPadding();
+      if (this.minimapContainer && this.minimapContainer.parentNode) {
+        this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+      }
+      this.minimapContainer = null;
+      this.minimapContent = null;
+      this.slider = null;
+      return;
+    }
 
     this.removeEditorPadding();
 
@@ -4994,8 +5092,17 @@ class MinimapPlugin extends Plugin {
       restoreMatchCount = this._lastListMatchCount || this._pendingMatchCount;
     }
 
-    if (!restoreFileMap || !restoreTerm) return;
+    if (!restoreFileMap || !restoreTerm) {
+      // If search is in progress, show the list and wait for results
+      if (this._searchInProgress && pendingTerm) {
+        this._isListVisible = true;
+        this._showMatchListLoading(pendingTerm);
+        this.positionListNearFloatingToggle();
+      }
+      return;
+    }
     this._pendingShowList = { searchText: restoreTerm, matchCount: restoreMatchCount };
+    this._isListVisible = true;
     this.renderMatchList(restoreFileMap, restoreMatchCount, false);
     this._listShownFromHover = true;
     
@@ -5156,14 +5263,18 @@ class MinimapPlugin extends Plugin {
         this._pendingMatchCount = cached.matchCount;
         this._pendingShowList = { searchText: term, matchCount: cached.matchCount };
         this.highlightMatches();
-        this.renderMatchList(cached.fileMap, cached.matchCount, false);
+        if (this._isListVisible) {
+          this.renderMatchList(cached.fileMap, cached.matchCount, false);
+        }
         this.updateFloatingToggleBadge(cached.fileMap.size, cached.matchCount);
       } else {
         this._pendingShowList = { searchText: term, matchCount: 0 };
         this._cachedMatchList = null;
         this._cachedMatchListKey = null;
         this._pendingMatchCount = 0;
-        this.renderMatchList(new Map(), 0, false);
+        if (this._isListVisible) {
+          this.renderMatchList(new Map(), 0, false);
+        }
         this.updateFloatingToggleBadge(0, 0);
         this.highlightMatches();
       }
@@ -5710,32 +5821,8 @@ class MinimapPlugin extends Plugin {
   _showMatchListLoading(searchText) {
     if (!this.matchList) return;
     if (!this._isListVisible) {
-      this.matchList.innerHTML = '';
-      const header = document.createElement('div');
-      header.className = 'minimap-match-list-header';
-      header.addEventListener('mousedown', (e) => {
-        this.isInteractingWithList = true;
-      });
-      const headerText = document.createElement('span');
-      headerText.className = 'minimap-match-list-header-text';
-      headerText.textContent = `⏳ ${searchText}`;
-      header.appendChild(headerText);
-      if (this.floatingSearchBox) {
-        this.floatingSearchBox.placeholder = t('searchPlaceholder');
-        this.floatingSearchBox.style.marginLeft = '8px';
-        header.appendChild(this.floatingSearchBox);
-      }
-      this.matchList.appendChild(header);
-      const container = document.createElement('div');
-      container.className = 'minimap-match-list-container';
-      const loading = document.createElement('div');
-      loading.style.cssText = 'padding:16px;text-align:center;color:var(--text-muted);font-size:12px;';
-      loading.textContent = t('building');
-      container.appendChild(loading);
-      this.matchList.appendChild(container);
-      this.matchList.style.display = 'block';
-      this.matchList.style.opacity = this.listOpacity;
-      this._isListVisible = true;
+      // Don't auto-show the list; just prepare data in the background
+      return;
     } else {
       const container = this.matchList.querySelector('.minimap-match-list-container');
       if (container) {
@@ -5789,7 +5876,9 @@ class MinimapPlugin extends Plugin {
         emptyContainer.style.cssText = 'padding:12px;text-align:center;color:var(--text-faint);font-size:12px;';
         emptyContainer.textContent = '...';
         this.matchList.appendChild(emptyContainer);
-        this.matchList.style.display = 'flex';
+        if (this._isListVisible) {
+          this.matchList.style.display = 'flex';
+        }
       } else {
         this.matchList.style.display = 'none';
       }
@@ -6255,9 +6344,10 @@ class MinimapPlugin extends Plugin {
       globalFileIndex++;
     });
 
-    this.matchList.style.display = 'block';
-    this.matchList.style.opacity = this.listOpacity;
-    this._isListVisible = true;
+    if (this._isListVisible) {
+      this.matchList.style.display = 'block';
+      this.matchList.style.opacity = this.listOpacity;
+    }
 
     if (this.floatingSearchBox) {
       setTimeout(() => { this.floatingSearchBox.focus(); }, 50);
@@ -8381,6 +8471,18 @@ class MinimapPlugin extends Plugin {
 
   updateMinimapContent() {
     if (!this.minimapContent) return;
+
+    // Check if the minimap container's parent view is blacklisted
+    if (this.minimapContainer && this.minimapContainer.parentNode) {
+      const leafInfo = this._getViewInfoFromContainer(this.minimapContainer.parentNode);
+      if (leafInfo && this._isViewInfoBlacklisted(leafInfo)) {
+        this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+        this.minimapContainer = null;
+        this.minimapContent = null;
+        this.slider = null;
+        return;
+      }
+    }
 
     if (this.isReadingMode()) {
       const file = this.app.workspace.activeLeaf?.view?.file;
