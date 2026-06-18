@@ -30,6 +30,19 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.1 (2026-06-18)</summary>
+
+- **Counter Style Presets / 计数样式预设** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings / 新增6种计数badge样式预设（毛玻璃、渐变胶囊、描边气泡、丝带旗帜、圆点指示器），设置面板可选
+- **Counter line-height Fix / 计数行高修复** — Added `line-height:1` to counter `::after` pseudo-elements, fixing vertical padding that couldn't be reduced below a minimum / 计数器`::after`伪元素添加`line-height:1`，修复垂直内边距无法继续缩小的问题
+- **Settings Section Shading / 设置面板底纹** — Collapsible section titles now have background shading for better visual separation / 可折叠标题部分添加底纹，增强视觉分隔
+- **Multi-Keyword Search / 多关键词搜索** — Pipe-separated keywords (e.g. `鸽子|导航|磁场`) search across vault; results sorted by keyword match count; each keyword highlighted in a different color / 竖线分隔多关键词全库搜索，按匹配关键词数排序，每个关键词不同颜色高亮
+- **Require All Keywords / 仅显示包含所有关键词的文档** — New option (default on) to only show documents containing all search keywords / 新增选项（默认开启），仅显示包含所有搜索关键词的文档
+- **Search Loading Indicator / 搜索加载提示** — All search modes now show a "Building..." indicator while searching / 所有搜索模式搜索时显示"正在构建..."提示
+- **Search on Input Toggle / 输入即搜选项** — New option (default off) to require Enter key to trigger search instead of typing / 新增选项（默认关闭），需按Enter才触发搜索而非输入即搜
+
+</details>
+
+<details>
 <summary>v1.4.0 (2026-06-17)</summary>
 
 - **Selection Match Window Fix / 选中关键词匹配窗口修复** — Fixed bug where hovering the floating toggle after selecting new text would show the previous keyword instead of the current selection; now correctly prioritizes the active search term over the last-displayed term / 修复选中新关键词后悬停悬浮按钮仍显示旧关键词的问题；现在正确优先使用当前搜索词而非上次显示的词

@@ -107,7 +107,10 @@ const DEFAULT_SETTINGS = {
   minimapBlacklist: '*.canvas',
   searchWordCountMin: 0,
   searchWordCountMax: 0,
-  language: 'zh'
+  language: 'zh',
+  counterStylePreset: 'default',
+  multiKeywordRequireAll: true,
+  searchOnInput: false
 };
 
 const I18N = {
@@ -161,6 +164,15 @@ const I18N = {
     counterPaddingH: '计数水平内边距 (px)',
     counterPaddingV: '计数垂直内边距 (px)',
     counterTopOffset: '计数上偏移 (px)',
+    counterStylePreset: '计数样式预设',
+    counterPresetDefault: '默认',
+    counterPresetGlass: '毛玻璃',
+    counterPresetGradient: '渐变胶囊',
+    counterPresetOutlined: '描边气泡',
+    counterPresetRibbon: '丝带旗帜',
+    counterPresetDot: '圆点指示',
+    multiKeywordRequireAll: '仅显示包含所有关键词的文档',
+    searchOnInput: '输入即搜',
     clearCountOnClose: '关闭文档清除计数',
     pinnedMatches: '已固定匹配项',
     clearAllCounts: '清除所有计数',
@@ -176,7 +188,7 @@ const I18N = {
     clearDocPinned: '清除该文档所有固定项',
     clear: '清除',
     remove: '删除',
-    searchPlaceholder: '搜索...',
+    searchPlaceholder: '搜索... (竖线分隔多关键词: 鸽子|导航|磁场)',
     unpin: '取消固定',
     clearPinned: (n) => `清除${n}个固定项`,
     pinMatch: '固定此匹配',
@@ -274,6 +286,15 @@ const I18N = {
     counterPaddingH: 'Counter H Padding (px)',
     counterPaddingV: 'Counter V Padding (px)',
     counterTopOffset: 'Counter Top Offset (px)',
+    counterStylePreset: 'Counter Style Preset',
+    counterPresetDefault: 'Default',
+    counterPresetGlass: 'Glassmorphism',
+    counterPresetGradient: 'Gradient Capsule',
+    counterPresetOutlined: 'Outlined',
+    counterPresetRibbon: 'Ribbon',
+    counterPresetDot: 'Dot Indicator',
+    multiKeywordRequireAll: 'Only show docs with all keywords',
+    searchOnInput: 'Search on input',
     clearCountOnClose: 'Clear Count on Close',
     pinnedMatches: 'Pinned Matches',
     clearAllCounts: 'Clear All Counts',
@@ -289,7 +310,7 @@ const I18N = {
     clearDocPinned: 'Clear all pinned items for this doc',
     clear: 'Clear',
     remove: 'Remove',
-    searchPlaceholder: 'Search...',
+    searchPlaceholder: 'Search... (pipe-separated: bird|navigation|magnet)',
     unpin: 'Unpin',
     clearPinned: (n) => `Clear ${n} pinned items`,
     pinMatch: 'Pin this match',
@@ -956,6 +977,14 @@ class MinimapPlugin extends Plugin {
               <input type="number" id="minimap-searchwordcountmax" value="${this.settings.searchWordCountMax ?? 0}" min="0" max="100" style="width:60px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
             </div>
           </div>
+          <div class="minimap-settings-row">
+            <label>${t('multiKeywordRequireAll')}</label>
+            <input type="checkbox" id="minimap-multikeywordrequireall" ${this.settings.multiKeywordRequireAll !== false ? 'checked' : ''}>
+          </div>
+          <div class="minimap-settings-row">
+            <label>${t('searchOnInput')}</label>
+            <input type="checkbox" id="minimap-searchoninput" ${this.settings.searchOnInput ? 'checked' : ''}>
+          </div>
         </div>
         <div class="minimap-settings-tab-content" data-tab="counter">
           <div class="minimap-settings-section-title">${t('pinIcon')}</div>
@@ -1009,6 +1038,19 @@ class MinimapPlugin extends Plugin {
           <div id="minimap-color-schemes"></div>
           <button id="minimap-add-colorscheme" style="width:100%;margin-top:6px;padding:4px 8px;cursor:pointer;">${t('addColor')}</button>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('counterStyle')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterStylePreset')}</label>
+              <select id="minimap-counterstylepreset" style="padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
+                <option value="default" ${this.settings.counterStylePreset === 'default' ? 'selected' : ''}>${t('counterPresetDefault')}</option>
+                <option value="glass" ${this.settings.counterStylePreset === 'glass' ? 'selected' : ''}>${t('counterPresetGlass')}</option>
+                <option value="gradient" ${this.settings.counterStylePreset === 'gradient' ? 'selected' : ''}>${t('counterPresetGradient')}</option>
+                <option value="outlined" ${this.settings.counterStylePreset === 'outlined' ? 'selected' : ''}>${t('counterPresetOutlined')}</option>
+                <option value="ribbon" ${this.settings.counterStylePreset === 'ribbon' ? 'selected' : ''}>${t('counterPresetRibbon')}</option>
+                <option value="dot" ${this.settings.counterStylePreset === 'dot' ? 'selected' : ''}>${t('counterPresetDot')}</option>
+              </select>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('matchOpacity')}</label>
@@ -1221,7 +1263,10 @@ class MinimapPlugin extends Plugin {
       piniconfollowoffsety: this.settingsPanel.querySelector('#minimap-piniconfollowoffsety'),
       simplifiedcolorscheme: this.settingsPanel.querySelector('#minimap-simplifiedcolorscheme'),
       searchwordcountmin: this.settingsPanel.querySelector('#minimap-searchwordcountmin'),
-      searchwordcountmax: this.settingsPanel.querySelector('#minimap-searchwordcountmax')
+      searchwordcountmax: this.settingsPanel.querySelector('#minimap-searchwordcountmax'),
+      counterstylepreset: this.settingsPanel.querySelector('#minimap-counterstylepreset'),
+      multikeywordrequireall: this.settingsPanel.querySelector('#minimap-multikeywordrequireall'),
+      searchoninput: this.settingsPanel.querySelector('#minimap-searchoninput')
     };
 
     const counterBgOpacityValue = this.settingsPanel.querySelector('#minimap-counterbgopacity-value');
@@ -1252,6 +1297,7 @@ class MinimapPlugin extends Plugin {
       this.settings.counterPaddingH = parseFloat(inputs.counterpaddingh.value) || DEFAULT_SETTINGS.counterPaddingH;
       this.settings.counterPaddingV = isNaN(parseFloat(inputs.counterpaddingv.value)) ? DEFAULT_SETTINGS.counterPaddingV : parseFloat(inputs.counterpaddingv.value);
       this.settings.counterTopOffset = isNaN(parseFloat(inputs.countertopoffset.value)) ? DEFAULT_SETTINGS.counterTopOffset : parseFloat(inputs.countertopoffset.value);
+      this.settings.counterStylePreset = inputs.counterstylepreset.value || 'default';
 
       this.settings.floatingToggleFontSize = parseFloat(inputs.floatingtogglefontsize.value) || DEFAULT_SETTINGS.floatingToggleFontSize;
       this.settings.floatingTogglePaddingH = parseFloat(inputs.floatingtogglepaddingh.value) || DEFAULT_SETTINGS.floatingTogglePaddingH;
@@ -1269,6 +1315,8 @@ class MinimapPlugin extends Plugin {
       this.settings.pinIconFollowOffsetX = parseInt(inputs.piniconfollowoffsetx.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
       this.settings.pinIconFollowOffsetY = parseInt(inputs.piniconfollowoffsety.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
       this.settings.simplifiedColorScheme = inputs.simplifiedcolorscheme.checked;
+      this.settings.multiKeywordRequireAll = inputs.multikeywordrequireall.checked;
+      this.settings.searchOnInput = inputs.searchoninput.checked;
       opacityValue.textContent = this.settings.opacity.toFixed(1);
       contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
       matchOpacityValue.textContent = this.settings.matchOpacity.toFixed(2);
@@ -1331,6 +1379,7 @@ class MinimapPlugin extends Plugin {
       inputs.counterpaddingh.value = this.settings.counterPaddingH;
       inputs.counterpaddingv.value = this.settings.counterPaddingV;
       inputs.countertopoffset.value = this.settings.counterTopOffset;
+      inputs.counterstylepreset.value = this.settings.counterStylePreset;
 
       inputs.floatingtogglefontsize.value = this.settings.floatingToggleFontSize;
       inputs.floatingtogglepaddingh.value = this.settings.floatingTogglePaddingH;
@@ -1346,6 +1395,8 @@ class MinimapPlugin extends Plugin {
       inputs.piniconfollowoffsetx.value = this.settings.pinIconFollowOffsetX ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
       inputs.piniconfollowoffsety.value = this.settings.pinIconFollowOffsetY ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
       inputs.simplifiedcolorscheme.checked = this.settings.simplifiedColorScheme;
+      inputs.multikeywordrequireall.checked = this.settings.multiKeywordRequireAll !== false;
+      inputs.searchoninput.checked = this.settings.searchOnInput;
       inputs.searchwordcountmin.value = this.settings.searchWordCountMin ?? 0;
       inputs.searchwordcountmax.value = this.settings.searchWordCountMax ?? 0;
       opacityValue.textContent = this.settings.opacity.toFixed(1);
@@ -1672,6 +1723,7 @@ class MinimapPlugin extends Plugin {
       e.stopPropagation();
     });
     this.floatingSearchBox.addEventListener('input', () => {
+      if (!this.settings.searchOnInput) return;
       if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
       this._searchDebounceTimer = setTimeout(() => {
         const query = this.floatingSearchBox.value.trim();
@@ -3495,6 +3547,56 @@ class MinimapPlugin extends Plugin {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
+  _highlightKeywordsInElement(el, keywords, colors) {
+    if (!el || !keywords || keywords.length === 0) return;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+    for (const textNode of textNodes) {
+      const text = textNode.textContent;
+      if (!text) continue;
+      let hasAnyMatch = false;
+      for (const kw of keywords) {
+        if (text.toLowerCase().includes(kw.toLowerCase())) {
+          hasAnyMatch = true;
+          break;
+        }
+      }
+      if (!hasAnyMatch) continue;
+
+      const fragment = document.createDocumentFragment();
+      let remaining = text;
+      while (remaining.length > 0) {
+        let earliestIdx = remaining.length;
+        let earliestKwIdx = -1;
+        for (let ki = 0; ki < keywords.length; ki++) {
+          const idx = remaining.toLowerCase().indexOf(keywords[ki].toLowerCase());
+          if (idx !== -1 && idx < earliestIdx) {
+            earliestIdx = idx;
+            earliestKwIdx = ki;
+          }
+        }
+        if (earliestKwIdx === -1) {
+          fragment.appendChild(document.createTextNode(remaining));
+          break;
+        }
+        if (earliestIdx > 0) {
+          fragment.appendChild(document.createTextNode(remaining.slice(0, earliestIdx)));
+        }
+        const kw = keywords[earliestKwIdx];
+        const color = colors[earliestKwIdx];
+        const mark = document.createElement('mark');
+        mark.textContent = remaining.slice(earliestIdx, earliestIdx + kw.length);
+        mark.style.cssText = `background:${color}33;color:${color};padding:0 2px;border-radius:3px;font-weight:600;`;
+        fragment.appendChild(mark);
+        remaining = remaining.slice(earliestIdx + kw.length);
+      }
+      textNode.parentNode.replaceChild(fragment, textNode);
+    }
+  }
+
   // Get total line count
   getTotalLines() {
     if (this.isReadingMode()) {
@@ -4008,6 +4110,49 @@ class MinimapPlugin extends Plugin {
   pinCurrentSelection() {
     if (!this.currentSelection) return;
 
+    const multiKeywords = this.parseMultiKeywords(this.currentSelection);
+    if (multiKeywords) {
+      const keywordColors = this.getMultiKeywordColors(multiKeywords.length);
+      const currentFile = this.app.workspace.activeLeaf?.view?.file;
+      const currentFilePath = currentFile ? currentFile.path : '';
+      const currentFileName = currentFile ? currentFile.basename : '';
+
+      for (let ki = 0; ki < multiKeywords.length; ki++) {
+        const kw = multiKeywords[ki];
+        const color = keywordColors[ki];
+        const existingIndex = this.savedMatchLists.findIndex(m => m.selection === kw);
+        if (existingIndex >= 0) {
+          this.savedMatchLists[existingIndex].pinned = true;
+          this.savedMatchLists[existingIndex].borderColor = color;
+          this.savedMatchLists[existingIndex].counterBgColor = color;
+          this.savedMatchLists[existingIndex].counterColor = '#ffffff';
+          this.savedMatchLists[existingIndex]._multiKeywordParent = this.currentSelection;
+          if (!this.savedMatchLists[existingIndex].filePath) {
+            this.savedMatchLists[existingIndex].filePath = currentFilePath;
+            this.savedMatchLists[existingIndex].fileName = currentFileName;
+          }
+        } else {
+          this.savedMatchLists.unshift({
+            selection: kw,
+            pinned: true,
+            colorIndex: 0,
+            borderColor: color,
+            counterBgColor: color,
+            counterColor: '#ffffff',
+            matchCount: 0,
+            filePath: currentFilePath,
+            fileName: currentFileName,
+            _multiKeywordParent: this.currentSelection
+          });
+        }
+      }
+
+      this.saveListData();
+      this.clearHighlights();
+      this.showPinnedDecorations();
+      return;
+    }
+
     // Calculate next color index
     const pinnedItems = this.savedMatchLists.filter(m => m.pinned);
     const nextColorIndex = pinnedItems.length % this.settings.pinColorSchemes.length;
@@ -4052,13 +4197,25 @@ class MinimapPlugin extends Plugin {
   }
 
   unpinSelection(selection) {
-    const index = this.savedMatchLists.findIndex(m => m.selection === selection && m.pinned);
-    if (index >= 0) {
-      this.savedMatchLists[index].pinned = false;
-      delete this.savedMatchLists[index].colorIndex;
-      delete this.savedMatchLists[index].borderColor;
-      delete this.savedMatchLists[index].counterBgColor;
-      delete this.savedMatchLists[index].counterColor;
+    const item = this.savedMatchLists.find(m => m.selection === selection && m.pinned);
+    if (item) {
+      item.pinned = false;
+      delete item.colorIndex;
+      delete item.borderColor;
+      delete item.counterBgColor;
+      delete item.counterColor;
+      if (item._multiKeywordParent) {
+        const parent = item._multiKeywordParent;
+        this.savedMatchLists.forEach(m => {
+          if (m._multiKeywordParent === parent && m.pinned) {
+            m.pinned = false;
+            delete m.colorIndex;
+            delete m.borderColor;
+            delete m.counterBgColor;
+            delete m.counterColor;
+          }
+        });
+      }
       this.saveListData();
     }
     this.clearHighlights();
@@ -4069,10 +4226,17 @@ class MinimapPlugin extends Plugin {
   }
 
   removePinnedSelection(selection) {
-    const index = this.savedMatchLists.findIndex(m => m.selection === selection);
-    if (index >= 0) {
-      this.savedMatchLists.splice(index, 1);
+    const item = this.savedMatchLists.find(m => m.selection === selection);
+    if (item && item._multiKeywordParent) {
+      const parent = item._multiKeywordParent;
+      this.savedMatchLists = this.savedMatchLists.filter(m => m._multiKeywordParent !== parent);
       this.saveListData();
+    } else {
+      const index = this.savedMatchLists.findIndex(m => m.selection === selection);
+      if (index >= 0) {
+        this.savedMatchLists.splice(index, 1);
+        this.saveListData();
+      }
     }
     this.clearHighlights();
     this.showPinnedDecorations();
@@ -4509,7 +4673,7 @@ class MinimapPlugin extends Plugin {
         }
 
         const mark = document.createElement('mark');
-        mark.className = `minimap-reading-match${hideCounter ? ' minimap-hide-counter' : ''}`;
+        mark.className = `minimap-reading-match${this.getCounterPresetClass()}${hideCounter ? ' minimap-hide-counter' : ''}`;
         mark.textContent = text.substring(matchPos, matchPos + searchText.length);
         const matchOpacity = this.settings.matchOpacity ?? 0.6;
         const c = this.hexToRgba(borderColor, matchOpacity);
@@ -5167,7 +5331,12 @@ class MinimapPlugin extends Plugin {
     // When list is pinned to a specific search text
     if (this._listPinnedSearchText && this._listPinnedSearchText !== searchText) {
       this._pendingShowList = { searchText, matchCount };
-      if (this.settings.exhaustiveMode) {
+      const mk = this.parseMultiKeywords(searchText);
+      if (mk) {
+        this._multiKeywordData = null;
+        this._showMatchListLoading(searchText);
+        this.performMultiKeywordSearch(searchText, mk);
+      } else if (this.settings.exhaustiveMode) {
         this.performExhaustiveSearch(searchText, matchCount, null);
       } else {
         this._performMatchListSearch(searchText, matchCount, true).then(() => {
@@ -5178,11 +5347,30 @@ class MinimapPlugin extends Plugin {
       return;
     }
 
+    // Multi-keyword search (pipe-separated)
+    const multiKeywords = this.parseMultiKeywords(searchText);
+    if (multiKeywords) {
+      this._pendingShowList = { searchText, matchCount };
+      this._multiKeywordData = null;
+      if (!this._exhaustiveSearchDone) {
+        this._exhaustiveSearchDone = true;
+        this._showMatchListLoading(searchText);
+        this.performMultiKeywordSearch(searchText, multiKeywords);
+      } else if (this._cachedMatchList && this._cachedMatchListKey === searchText) {
+        this.updateFloatingToggleBadge(this._cachedMatchList.size, this._pendingMatchCount || matchCount);
+        if (this._isListVisible) {
+          this.renderMatchList(this._cachedMatchList, this._pendingMatchCount || matchCount, false);
+        }
+      }
+      return;
+    }
+
     // In exhaustive mode, skip heading cache and use full-text search directly
     if (this.settings.exhaustiveMode) {
       this._pendingShowList = { searchText, matchCount };
       if (!this._exhaustiveSearchDone) {
         this._exhaustiveSearchDone = true;
+        this._showMatchListLoading(searchText);
         this.performExhaustiveSearch(searchText, matchCount, null);
       }
       return;
@@ -5249,6 +5437,7 @@ class MinimapPlugin extends Plugin {
     const gen = this._searchGeneration;
     this._searchInProgress = true;
     this._pendingShowList = { searchText, matchCount };
+    this._showMatchListLoading(searchText);
 
     const allFiles = this.app.vault.getMarkdownFiles();
     const searchLower = searchText.toLowerCase();
@@ -5518,6 +5707,47 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  _showMatchListLoading(searchText) {
+    if (!this.matchList) return;
+    if (!this._isListVisible) {
+      this.matchList.innerHTML = '';
+      const header = document.createElement('div');
+      header.className = 'minimap-match-list-header';
+      header.addEventListener('mousedown', (e) => {
+        this.isInteractingWithList = true;
+      });
+      const headerText = document.createElement('span');
+      headerText.className = 'minimap-match-list-header-text';
+      headerText.textContent = `⏳ ${searchText}`;
+      header.appendChild(headerText);
+      if (this.floatingSearchBox) {
+        this.floatingSearchBox.placeholder = t('searchPlaceholder');
+        this.floatingSearchBox.style.marginLeft = '8px';
+        header.appendChild(this.floatingSearchBox);
+      }
+      this.matchList.appendChild(header);
+      const container = document.createElement('div');
+      container.className = 'minimap-match-list-container';
+      const loading = document.createElement('div');
+      loading.style.cssText = 'padding:16px;text-align:center;color:var(--text-muted);font-size:12px;';
+      loading.textContent = t('building');
+      container.appendChild(loading);
+      this.matchList.appendChild(container);
+      this.matchList.style.display = 'block';
+      this.matchList.style.opacity = this.listOpacity;
+      this._isListVisible = true;
+    } else {
+      const container = this.matchList.querySelector('.minimap-match-list-container');
+      if (container) {
+        container.innerHTML = '';
+        const loading = document.createElement('div');
+        loading.style.cssText = 'padding:16px;text-align:center;color:var(--text-muted);font-size:12px;';
+        loading.textContent = t('building');
+        container.appendChild(loading);
+      }
+    }
+  }
+
   renderMatchList(fileMap, matchCount, append = false) {
     const searchText = this._pendingShowList?.searchText || '';
 
@@ -5719,6 +5949,26 @@ class MinimapPlugin extends Plugin {
 
       headerEl.appendChild(expandIcon);
       headerEl.appendChild(fileNameEl);
+
+      // Multi-keyword tags
+      const mkData = this._multiKeywordData;
+      if (mkData) {
+        const matchedKeywords = new Set();
+        items.forEach(item => {
+          if (item.keyword) matchedKeywords.add(item.keywordIndex);
+        });
+        const tagContainer = document.createElement('span');
+        tagContainer.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap;flex-shrink:0;';
+        for (let ki = 0; ki < mkData.keywords.length; ki++) {
+          const tag = document.createElement('span');
+          const isMatched = matchedKeywords.has(ki);
+          tag.textContent = mkData.keywords[ki];
+          tag.style.cssText = `font-size:9px;padding:1px 5px;border-radius:6px;white-space:nowrap;${isMatched ? `background:${mkData.keywordColors[ki]}22;color:${mkData.keywordColors[ki]};border:1px solid ${mkData.keywordColors[ki]}44;` : 'background:var(--background-secondary);color:var(--text-faint);border:1px solid var(--background-modifier-border);'}`;
+          tagContainer.appendChild(tag);
+        }
+        headerEl.appendChild(tagContainer);
+      }
+
       headerEl.appendChild(countEl);
 
       headerEl.addEventListener('mousedown', (e) => {
@@ -5791,7 +6041,9 @@ class MinimapPlugin extends Plugin {
           if (entryIdxInGroup >= 3 && !isExpanded) itemWrapper.style.display = 'none';
 
           const dot = document.createElement('span');
-          dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:5px;`;
+          const mkData = this._multiKeywordData;
+          const dotBg = mkData && entry.keywordColor ? entry.keywordColor : dotColor;
+          dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${dotBg};flex-shrink:0;margin-top:5px;`;
           itemWrapper.appendChild(dot);
 
           const itemBox = document.createElement('div');
@@ -5878,6 +6130,18 @@ class MinimapPlugin extends Plugin {
             });
           } else {
             textEl.textContent = entry.text;
+          }
+
+          // Multi-keyword highlight in rendered text
+          if (mkData) {
+            const applyMkHighlight = () => {
+              this._highlightKeywordsInElement(textEl, mkData.keywords, mkData.keywordColors);
+            };
+            if (entry.isMarkdown || isTruncated) {
+              setTimeout(applyMkHighlight, 50);
+            } else {
+              applyMkHighlight();
+            }
           }
 
           itemBox.appendChild(textEl);
@@ -7647,7 +7911,7 @@ class MinimapPlugin extends Plugin {
         from: from,
         to: to,
         value: Decoration.mark({
-          class: `minimap-editor-match${hideCounter ? ' minimap-hide-counter' : ''}`,
+          class: `minimap-editor-match${this.getCounterPresetClass()}${hideCounter ? ' minimap-hide-counter' : ''}`,
           attributes: {
             'data-match': label,
             'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(borderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;`
@@ -7725,7 +7989,7 @@ class MinimapPlugin extends Plugin {
               from: from,
               to: to,
               value: Decoration.mark({
-                class: `minimap-editor-match pinned${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
+                class: `minimap-editor-match pinned${this.getCounterPresetClass()}${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
                 attributes: {
                   'data-selection': pinnedItem.selection,
                   'data-match': `${matchIndex}/${totalPinnedMatches}`,
@@ -7776,7 +8040,7 @@ class MinimapPlugin extends Plugin {
               from: from,
               to: to,
               value: Decoration.mark({
-                class: 'minimap-editor-match',
+                class: `minimap-editor-match${this.getCounterPresetClass()}`,
                 attributes: {
                   'data-match': label,
                   'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(currentBorderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(currentBorderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${currentCounterBgColor};--minimap-counter-color: ${currentCounterColor};`
@@ -7901,7 +8165,7 @@ class MinimapPlugin extends Plugin {
               from: from,
               to: to,
               value: Decoration.mark({
-                class: `minimap-editor-match pinned${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
+                class: `minimap-editor-match pinned${this.getCounterPresetClass()}${pinnedItem.countHidden ? ' minimap-hide-counter' : ''}`,
                 attributes: {
                   'data-selection': pinnedItem.selection,
                   'data-match': `${matchIndex}/${totalPinnedMatches}`,
@@ -7922,6 +8186,164 @@ class MinimapPlugin extends Plugin {
       cm.dispatch({
         effects: setMatchHighlights.of(decorationSet)
       });
+    }
+  }
+
+  getCounterPresetClass() {
+    const preset = this.settings.counterStylePreset;
+    if (!preset || preset === 'default') return '';
+    return ` minimap-counter-${preset}`;
+  }
+
+  parseMultiKeywords(searchText) {
+    if (!searchText || !searchText.includes('|')) return null;
+    const keywords = searchText.split('|').map(k => k.trim()).filter(k => k.length > 0);
+    return keywords.length >= 2 ? keywords : null;
+  }
+
+  getMultiKeywordColors(count) {
+    const palettes = [
+      '#ff6600', '#2196F3', '#4CAF50', '#9C27B0', '#FF9800',
+      '#E91E63', '#00BCD4', '#8BC34A', '#FF5722', '#607D8B'
+    ];
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+      colors.push(palettes[i % palettes.length]);
+    }
+    return colors;
+  }
+
+  async performMultiKeywordSearch(searchText, keywords) {
+    this._searchGeneration++;
+    const gen = this._searchGeneration;
+    this._searchInProgress = true;
+
+    const keywordColors = this.getMultiKeywordColors(keywords.length);
+    const fileResults = new Map();
+
+    const extractSnippetsForKeyword = (content, kwLower, maxSnippets = 30) => {
+      const lines = content.split('\n');
+      const snippets = [];
+      for (let i = 0; i < lines.length && snippets.length < maxSnippets; i++) {
+        const lineLower = lines[i].toLowerCase();
+        const idx = lineLower.indexOf(kwLower);
+        if (idx !== -1) {
+          const trimmed = lines[i].trim();
+          if (trimmed.length > 0) {
+            let snippet = trimmed;
+            let fullLine = trimmed;
+            let truncateStart = 0;
+            let truncateEnd = trimmed.length;
+            if (snippet.length > 120) {
+              const matchIdx = snippet.toLowerCase().indexOf(kwLower);
+              truncateStart = Math.max(0, matchIdx - 30);
+              truncateEnd = Math.min(snippet.length, matchIdx + kwLower.length + 70);
+              snippet = snippet.slice(truncateStart, truncateEnd);
+            }
+            snippets.push({ text: snippet, fullLine, truncateStart, truncateEnd });
+          }
+        }
+      }
+      return snippets;
+    };
+
+    try {
+      for (let ki = 0; ki < keywords.length; ki++) {
+        if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+        const kw = keywords[ki];
+        const kwLower = kw.toLowerCase();
+        const allFiles = this.app.vault.getMarkdownFiles();
+
+        for (const file of allFiles) {
+          if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+          try {
+            const nameMatch = file.name.toLowerCase().includes(kwLower);
+            const content = await this.app.vault.cachedRead(file);
+            if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+            const contentMatch = content && content.toLowerCase().includes(kwLower);
+
+            if (nameMatch || contentMatch) {
+              if (!fileResults.has(file.path)) {
+                fileResults.set(file.path, { file, keywordHits: [], totalMatches: 0 });
+              }
+              const entry = fileResults.get(file.path);
+              const matchCount = contentMatch
+                ? (content.toLowerCase().split(kwLower).length - 1)
+                : 1;
+              const snippets = contentMatch ? extractSnippetsForKeyword(content, kwLower) : [];
+              entry.keywordHits.push({
+                keyword: kw,
+                keywordIndex: ki,
+                color: keywordColors[ki],
+                matchCount,
+                snippets
+              });
+              entry.totalMatches += matchCount;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Multi-keyword search error:', e);
+    }
+
+    if (this._searchGeneration !== gen) { this._searchInProgress = false; return; }
+
+    const sortedEntries = [...fileResults.values()].filter(entry => {
+      if (this.settings.multiKeywordRequireAll !== false) {
+        return entry.keywordHits.length === keywords.length;
+      }
+      return true;
+    }).sort((a, b) => {
+      if (b.keywordHits.length !== a.keywordHits.length) {
+        return b.keywordHits.length - a.keywordHits.length;
+      }
+      return b.totalMatches - a.totalMatches;
+    });
+
+    const fileMap = new Map();
+    let totalAllDocMatches = 0;
+    for (const entry of sortedEntries.slice(0, 200)) {
+      const items = [];
+      for (const hit of entry.keywordHits) {
+        if (hit.snippets.length > 0) {
+          items.push({
+            text: hit.snippets[0].text,
+            level: 0,
+            type: 'content',
+            snippets: hit.snippets,
+            keyword: hit.keyword,
+            keywordIndex: hit.keywordIndex,
+            keywordColor: hit.color
+          });
+        } else {
+          items.push({
+            text: entry.file.basename,
+            level: 0,
+            type: 'content',
+            keyword: hit.keyword,
+            keywordIndex: hit.keywordIndex,
+            keywordColor: hit.color
+          });
+        }
+      }
+      totalAllDocMatches += entry.totalMatches;
+      fileMap.set(entry.file, items);
+    }
+
+    this._searchInProgress = false;
+    this._cachedMatchList = fileMap;
+    this._cachedMatchListKey = searchText;
+    this._multiKeywordData = { keywords, keywordColors };
+    this._pendingShowList = { searchText, matchCount: totalAllDocMatches };
+    this._pendingMatchCount = totalAllDocMatches;
+    this._recentSearchCaches[searchText] = { fileMap, matchCount: totalAllDocMatches };
+    this.updateFloatingToggleBadge(fileMap.size, totalAllDocMatches);
+
+    if (this._isListVisible || this._keepListVisible) {
+      this.renderMatchList(fileMap, totalAllDocMatches, false);
     }
   }
 

@@ -1,6 +1,16 @@
 # Changelog
 
-## 🆕 v1.4.0 (2026-06-17)
+## 🆕 v1.4.1 (2026-06-18)
+
+- **Counter Style Presets** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings
+- **Counter line-height Fix** — Added `line-height:1` to counter `::after` pseudo-elements, fixing vertical padding that couldn't be reduced below a minimum
+- **Settings Section Shading** — Collapsible section titles now have background shading for better visual separation
+- **Multi-Keyword Search** — Pipe-separated keywords (e.g. `鸽子|导航|磁场`) search across vault; results sorted by keyword match count; each keyword highlighted in a different color
+- **Require All Keywords** — New option (default on) to only show documents containing all search keywords
+- **Search Loading Indicator** — All search modes now show a "Building..." indicator while searching
+- **Search on Input Toggle** — New option (default off) to require Enter key to trigger search instead of typing
+
+## v1.4.0 (2026-06-17)
 
 - **Selection Match Window Fix** — Fixed bug where hovering the floating toggle after selecting new text would show the previous keyword instead of the current selection; now correctly prioritizes the active search term over the last-displayed term
 - **Pinned List State Sync** — `_pendingShowList` now updates even when the list is pinned or in exhaustive mode, preventing stale display after keyword switch
