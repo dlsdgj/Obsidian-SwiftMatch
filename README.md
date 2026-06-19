@@ -30,6 +30,15 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.3 (2026-06-19)</summary>
+
+- **Snippet Expand Highlight Fix / 片段展开高亮修复** — Fixed keyword highlights being lost when clicking the "+" button to expand truncated snippets; highlights now re-apply after markdown rendering completes for both single-keyword and multi-keyword searches / 修复点击"+"按钮展开截断片段后关键词高亮丢失的问题；markdown渲染完成后自动重新应用高亮，支持单关键词和多关键词搜索
+- **Multi-Keyword Data Restore / 多关键词数据恢复** — `_multiKeywordData` is now automatically restored from search text when `renderMatchList` is called from cached paths, preventing missing highlights on list re-render / 从缓存路径调用 `renderMatchList` 时自动从搜索文本恢复 `_multiKeywordData`，避免列表重新渲染时高亮缺失
+- **Preserve Search Data on Clear / 清除时保留搜索数据** — `clearHighlights()` no longer clears `_pendingSearchText` and `_pendingMatchCount` when cached match data exists, so the match window can be restored after clicking the editor / `clearHighlights()` 在有缓存数据时不再清空搜索文本和匹配计数，点击编辑器后重新打开匹配窗口仍可恢复之前的结果
+
+</details>
+
+<details>
 <summary>v1.4.2 (2026-06-18)</summary>
 
 - **Counter Style Presets / 计数样式预设** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings / 新增6种计数badge样式预设（毛玻璃、渐变胶囊、描边气泡、丝带旗帜、圆点指示器），设置面板可选
@@ -177,9 +186,3 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 </details>
 
 </details>
-
-## Sponsor / 赞助
-
-If you find this plugin helpful, consider buying me a coffee! / 如果这个插件对你有帮助，请考虑支持我！
-
-<img src="assets/reward.png" width="300" />

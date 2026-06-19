@@ -1,6 +1,12 @@
 # Changelog
 
-## 🆕 v1.4.2 (2026-06-18)
+## 🆕 v1.4.3 (2026-06-19)
+
+- **Snippet Expand Highlight Fix** — Fixed keyword highlights being lost when clicking the "+" button to expand truncated snippets; highlights now re-apply after markdown rendering completes for both single-keyword and multi-keyword searches
+- **Multi-Keyword Data Restore** — `_multiKeywordData` is now automatically restored from search text when `renderMatchList` is called from cached paths, preventing missing highlights on list re-render
+- **Preserve Search Data on Clear** — `clearHighlights()` no longer clears `_pendingSearchText` and `_pendingMatchCount` when cached match data exists, so the match window can be restored after clicking the editor
+
+## v1.4.2 (2026-06-18)
 
 - **Counter Style Presets** — Added 6 counter badge style presets (Glassmorphism, Gradient Capsule, Outlined, Ribbon, Dot Indicator) selectable in settings
 - **Counter line-height Fix** — Added `line-height:1` to counter `::after` pseudo-elements, fixing vertical padding that couldn't be reduced below a minimum

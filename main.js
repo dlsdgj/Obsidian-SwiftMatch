@@ -5838,6 +5838,15 @@ class MinimapPlugin extends Plugin {
   renderMatchList(fileMap, matchCount, append = false) {
     const searchText = this._pendingShowList?.searchText || '';
 
+    // Restore _multiKeywordData if it was cleared but searchText is multi-keyword
+    if (!this._multiKeywordData && searchText) {
+      const mk = this.parseMultiKeywords(searchText);
+      if (mk) {
+        const keywordColors = this.getMultiKeywordColors(mk.length);
+        this._multiKeywordData = { keywords: mk, keywordColors };
+      }
+    }
+
     if (fileMap.size === 0) {
       if (!append && this._pendingShowList?.searchText) {
         this.matchList.innerHTML = '';
@@ -6185,6 +6194,15 @@ class MinimapPlugin extends Plugin {
                 const renderedContent = snippetSpan.querySelector('p');
                 if (renderedContent) {
                   snippetSpan.innerHTML = renderedContent.innerHTML;
+                }
+                // Re-apply highlights after markdown rendering completes
+                const highlightData = this._multiKeywordData;
+                if (highlightData) {
+                  this._highlightKeywordsInElement(textEl, highlightData.keywords, highlightData.keywordColors);
+                } else if (searchText) {
+                  const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  const regex = new RegExp(`(${escaped})`, 'gi');
+                  this._highlightInElement(textEl, regex);
                 }
               });
               textEl.appendChild(snippetSpan);
@@ -8188,9 +8206,13 @@ class MinimapPlugin extends Plugin {
     if (!this._keepListVisible) {
       this.hideMatchList();
     }
-    this._pendingMatchCount = 0;
-    this._pendingSearchText = null;
-    this.updateFloatingToggleBadge(0, 0);
+    // Preserve _pendingMatchCount and _pendingSearchText so match list can be restored
+    // when reopened. Only clear the badge display when there's truly no cached data.
+    if (!this._cachedMatchList || this._cachedMatchList.size === 0) {
+      this._pendingMatchCount = 0;
+      this._pendingSearchText = null;
+      this.updateFloatingToggleBadge(0, 0);
+    }
   }
 
   showPinnedDecorations() {
