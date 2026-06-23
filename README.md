@@ -30,6 +30,28 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.5 (2026-06-24)</summary>
+
+- **Candy-mark Default Style / 糖果标记默认样式** — Reset to defaults now applies the candy-mark floating button style (warm gradient background, rounded corners) / 重置默认时应用 candy-mark 悬浮按钮样式（暖色渐变背景、圆角）
+- **Edit Panel Rename / 编辑面板重命名** — Renamed "编辑悬浮球" to "编辑悬浮按钮" / 将"编辑悬浮球"改为"编辑悬浮按钮"
+- **Display Text Font Size / 显示文字字体大小** — Default display text font size changed from 11 to 16 / 显示文字默认字体大小从11改为16
+- **Settings Panel Cleanup / 设置面板精简** — Removed font size, horizontal padding, vertical padding, opacity, and hide status bar settings from the floating button style section / 移除悬浮按钮样式下的文字大小、水平内边距、垂直内边距、透明度、隐藏底部状态栏设置
+- **Floating Button Default Visible / 悬浮按钮默认显示** — Floating button is now shown by default after resetting to defaults / 重置默认后悬浮按钮默认显示
+
+</details>
+
+<details>
+<summary>v1.4.4 (2026-06-23)</summary>
+
+- **Outlined Counter Opacity Link / 描边气泡透明度联动** — In outlined counter style, counter border and text opacity now follow the match opacity setting / 描边气泡样式下，计数边框和文字透明度跟随"匹配透明度"设置
+- **Counter Settings Cleanup / 计数设置精简** — Removed counter opacity, counter background opacity, counter horizontal/vertical padding settings; hardcoded padding to 0px 2px and opacity to 1 / 移除计数透明度、计数背景透明度、计数水平/垂直内边距设置；内边距硬编码为0px 2px，透明度硬编码为1
+- **Pin Icon Simplification / 固定图标简化** — Pin icon is now always a gray circle with gray "p"; clear/unpin icon is a gray circle with gray "x"; removed icon text setting / 固定图标始终为灰色圆圈灰色"p"；清除/取消固定图标为灰色圆圈灰色"x"；移除图标文字设置
+- **Word Count for English / 英文按单词计数** — Search word count limits now count words (space-separated) instead of characters / 搜索限制按单词数（空格分隔）计算，而非字符数
+- **Default Settings Update / 默认设置更新** — Updated default values: slider color #F0B27F, opacity 1.0, content opacity 1.0, hover collapse off, top 40, bottom offset 65, match opacity 0.15, pin icon size 12/opacity 0.7/offset 20/-20, min words 2, max words 7 / 更新默认值：滑块颜色#F0B27F、透明度1.0、内容透明度1.0、悬停展开关闭、顶部40、底部偏移65、匹配透明度0.15、图标大小12/透明度0.7/偏移20/-20、最少字数2、最多字数7
+
+</details>
+
+<details>
 <summary>v1.4.3 (2026-06-19)</summary>
 
 - **Snippet Expand Highlight Fix / 片段展开高亮修复** — Fixed keyword highlights being lost when clicking the "+" button to expand truncated snippets; highlights now re-apply after markdown rendering completes for both single-keyword and multi-keyword searches / 修复点击"+"按钮展开截断片段后关键词高亮丢失的问题；markdown渲染完成后自动重新应用高亮，支持单关键词和多关键词搜索
