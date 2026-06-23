@@ -45,27 +45,23 @@ class MatchHighlightPlugin {
 }
 
 const DEFAULT_SETTINGS = {
-  top: 80,
+  top: 40,
   width: 2,
   maxWidth: 80,
-  heightOffset: 100,
-  opacity: 0.3,
+  heightOffset: 65,
+  opacity: 1.0,
   editorPadding: 10,
-  sliderColor: '#888888',
+  sliderColor: '#F0B27F',
   highlightColor: '#ffc800',
   highlightCurrentColor: '#ff3232',
-  contentOpacity: 0.4,
-  collapseOnHover: true,
+  contentOpacity: 1.0,
+  collapseOnHover: false,
   collapseWidth: 8,
   matchBorderColor: '#ff6600',
-  matchOpacity: 0.6,
-  counterOpacity: 1.0,
-  counterBgOpacity: 1.0,
-  counterColor: '#ffffff',
+  matchOpacity: 0.15,
+  counterColor: '#aba6a6',
   counterBgColor: '#ff6600',
   counterSize: 9,
-  counterPaddingH: 2,
-  counterPaddingV: 0,
   counterTopOffset: -10,
   enableSelectionMatch: true,
   exhaustiveMode: true,
@@ -74,41 +70,40 @@ const DEFAULT_SETTINGS = {
   floatingToggleX: 50,
   floatingToggleY: 100,
   floatingToggleSize: 20,
-  floatingToggleVisible: false,
+  floatingToggleVisible: true,
   floatingToggleOpacity: 0.6,
   hideStatusBar: false,
   rightOffset: 0,
   pinIconEnabled: true,
   pinIconMode: 'follow',
-  pinIconSize: 20,
-  pinIconOpacity: 0.8,
+  pinIconSize: 12,
+  pinIconOpacity: 0.7,
   pinIconFixedLeft: null,
   pinIconFixedTop: null,
-  pinIconFollowOffsetX: 15,
-  pinIconFollowOffsetY: -10,
-  pinIconText: 'm',
+  pinIconFollowOffsetX: 20,
+  pinIconFollowOffsetY: -20,
   pinColorSchemes: [
-    { borderColor: '#ff6600', counterBgColor: '#ff6600', counterColor: '#ffffff' },
-    { borderColor: '#2196F3', counterBgColor: '#2196F3', counterColor: '#ffffff' },
-    { borderColor: '#4CAF50', counterBgColor: '#4CAF50', counterColor: '#ffffff' },
-    { borderColor: '#9C27B0', counterBgColor: '#9C27B0', counterColor: '#ffffff' },
-    { borderColor: '#FF9800', counterBgColor: '#FF9800', counterColor: '#ffffff' },
-    { borderColor: '#E91E63', counterBgColor: '#E91E63', counterColor: '#ffffff' }
+    { borderColor: '#ff6600', counterBgColor: '#ff6600', counterColor: '#aba6a6', borderLinked: true, counterLinked: true },
+    { borderColor: '#2196F3', counterBgColor: '#2196F3', counterColor: '#aba6a6', borderLinked: true, counterLinked: true },
+    { borderColor: '#4CAF50', counterBgColor: '#4CAF50', counterColor: '#aba6a6', borderLinked: true, counterLinked: true },
+    { borderColor: '#9C27B0', counterBgColor: '#9C27B0', counterColor: '#aba6a6', borderLinked: true, counterLinked: true },
+    { borderColor: '#FF9800', counterBgColor: '#FF9800', counterColor: '#aba6a6', borderLinked: true, counterLinked: true },
+    { borderColor: '#E91E63', counterBgColor: '#E91E63', counterColor: '#aba6a6', borderLinked: true, counterLinked: true }
   ],
   simplifiedColorScheme: true,
   clearCountOnClose: false,
   floatingToggleText: 'Swift',
-  floatingToggleFontSize: 11,
+  floatingToggleFontSize: 16,
   floatingTogglePaddingH: 10,
   floatingTogglePaddingV: 2,
-  floatingToggleStyleClass: '',
-  floatingToggleCustomStyle: '',
+  floatingToggleStyleClass: 'candy-mark',
+  floatingToggleCustomStyle: '.candy-mark { background: linear-gradient(120deg, #ffebcc 0%, #ffd9a5 100%); color: #b45f2b; padding: 2px 6px; border-radius: 12px; font-weight: 500; font-size: 0.9em; display: inline-block; }',
   keywordButtonStyles: {},
   minimapBlacklist: '*.canvas',
-  searchWordCountMin: 0,
-  searchWordCountMax: 0,
+  searchWordCountMin: 2,
+  searchWordCountMax: 7,
   language: 'zh',
-  counterStylePreset: 'default',
+  counterStylePreset: 'glass',
   multiKeywordRequireAll: true,
   searchOnInput: false
 };
@@ -165,12 +160,8 @@ const I18N = {
     counterPaddingV: '计数垂直内边距 (px)',
     counterTopOffset: '计数上偏移 (px)',
     counterStylePreset: '计数样式预设',
-    counterPresetDefault: '默认',
     counterPresetGlass: '毛玻璃',
-    counterPresetGradient: '渐变胶囊',
     counterPresetOutlined: '描边气泡',
-    counterPresetRibbon: '丝带旗帜',
-    counterPresetDot: '圆点指示',
     multiKeywordRequireAll: '仅显示包含所有关键词的文档',
     searchOnInput: '输入即搜',
     clearCountOnClose: '关闭文档清除计数',
@@ -181,6 +172,11 @@ const I18N = {
     about: '关于/更新',
     building: '正在构建...',
     border: '边框',
+    underline: '下划线',
+    counterBg: '计数背景',
+    counterTextColor: '计数文字',
+    bubbleBorder: '气泡边框',
+    syncColors: '同步下划线与背景色',
     background: '背景',
     text: '文字',
     noPinned: '暂无固定匹配项',
@@ -211,7 +207,7 @@ const I18N = {
     hideFloating: '隐藏',
     closeKeyword: '关闭',
     settings: '设置',
-    editTitle: '编辑悬浮球',
+    editTitle: '编辑悬浮按钮',
     toggleText: '显示文字',
     toggleFontSize: '字体大小',
     togglePaddingH: '水平内边距',
@@ -287,12 +283,8 @@ const I18N = {
     counterPaddingV: 'Counter V Padding (px)',
     counterTopOffset: 'Counter Top Offset (px)',
     counterStylePreset: 'Counter Style Preset',
-    counterPresetDefault: 'Default',
     counterPresetGlass: 'Glassmorphism',
-    counterPresetGradient: 'Gradient Capsule',
-    counterPresetOutlined: 'Outlined',
-    counterPresetRibbon: 'Ribbon',
-    counterPresetDot: 'Dot Indicator',
+    counterPresetOutlined: 'Outlined Bubble',
     multiKeywordRequireAll: 'Only show docs with all keywords',
     searchOnInput: 'Search on input',
     clearCountOnClose: 'Clear Count on Close',
@@ -303,6 +295,11 @@ const I18N = {
     about: 'About/Updates',
     building: 'Building...',
     border: 'Border',
+    underline: 'Underline',
+    counterBg: 'Counter BG',
+    counterTextColor: 'Counter Text',
+    bubbleBorder: 'Bubble Border',
+    syncColors: 'Sync underline & counter BG',
     background: 'Background',
     text: 'Text',
     noPinned: 'No pinned matches',
@@ -390,7 +387,6 @@ class MinimapPlugin extends Plugin {
     this.updateTimer = null;
     this.boundMouseMove = null;
     this.boundMouseUp = null;
-    this.boundOutsideClick = null;
     this.scrollHandler = null;
     this.editorScrollEl = null;
     this.opacity = 0.3;
@@ -484,6 +480,22 @@ class MinimapPlugin extends Plugin {
     this.boundListWheel = this.handleListWheel.bind(this);
     document.addEventListener('mousemove', this.boundMouseMove);
     document.addEventListener('mouseup', this.boundMouseUp);
+    
+    // Watch for theme changes to refresh counter colors
+    this._lastThemeDark = document.body.classList.contains('theme-dark');
+    this._themeObserver = new MutationObserver(() => {
+      const isDark = document.body.classList.contains('theme-dark');
+      if (isDark !== this._lastThemeDark) {
+        this._lastThemeDark = isDark;
+        const preset = this.settings.counterStylePreset || 'glass';
+        if (preset === 'glass') {
+          this.clearHighlights();
+          this.showPinnedDecorations();
+          if (this.currentSelection) this.highlightMatches();
+        }
+      }
+    });
+    this._themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     
     this.registerEvents();
     
@@ -771,16 +783,14 @@ class MinimapPlugin extends Plugin {
 
   applyCounterStyles() {
     const s = this.settings;
-    const counterOpacity = s.counterOpacity;
-    const counterBgOpacity = s.counterBgOpacity;
     const counterSize = s.counterSize;
-    const counterPadding = `${s.counterPaddingV}px ${s.counterPaddingH}px`;
+    const counterPadding = '0px 2px';
     const counterTopOffset = `${s.counterTopOffset}px`;
 
     // 更新阅读模式
     const readingEl = document.querySelector('.markdown-reading-view');
     if (readingEl) {
-      readingEl.style.setProperty('--minimap-counter-opacity', counterOpacity);
+      readingEl.style.setProperty('--minimap-counter-opacity', 1);
       readingEl.style.setProperty('--minimap-counter-size', `${counterSize}px`);
       readingEl.style.setProperty('--minimap-counter-padding', counterPadding);
       readingEl.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
@@ -790,18 +800,21 @@ class MinimapPlugin extends Plugin {
     const editor = this.getEditor();
     if (editor && editor.cm && editor.cm.scrollDOM) {
       const scrollDOM = editor.cm.scrollDOM;
-      scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
+      scrollDOM.style.setProperty('--minimap-counter-opacity', 1);
       scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
       scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
       scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
       // 背景透明度也需要更新（颜色从配色方案获取）
-      const counterColor = s.counterColor;
+      const currentPreset = s.counterStylePreset || 'glass';
+      const counterColor = currentPreset === 'glass'
+        ? (document.body.classList.contains('theme-dark') ? '#e0dcdc' : '#aba6a6')
+        : s.counterColor;
       const counterBgColor = s.counterBgColor;
       scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
-      scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+      scrollDOM.style.setProperty('--minimap-counter-bgcolor', currentPreset === 'outlined' ? counterBgColor : this.hexToRgba(counterBgColor, 1));
       if (readingEl) {
         readingEl.style.setProperty('--minimap-counter-color', counterColor);
-        readingEl.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+        readingEl.style.setProperty('--minimap-counter-bgcolor', currentPreset === 'outlined' ? counterBgColor : this.hexToRgba(counterBgColor, 1));
       }
     }
   }
@@ -876,7 +889,7 @@ class MinimapPlugin extends Plugin {
           <span id="minimap-lang-toggle" style="cursor:pointer;user-select:none;font-size:10px;font-weight:600;${this.settings.language === 'zh' ? 'color:#D85A30;' : 'color:#185FA5;'}letter-spacing:${this.settings.language === 'zh' ? '.1em' : '.08em'};">${this.settings.language === 'zh' ? 'CN' : 'EN'}</span>
           <span>${t('settingsTitle')} v${this.manifest.version || '1.0.0'}</span>
         </div>
-        <button class="minimap-settings-close">×</button>
+        <button class="minimap-settings-close">&times;</button>
       </div>
       <div class="minimap-settings-tabs">
         <div class="minimap-settings-tab active" data-tab="basic">${t('tabBasic')}</div>
@@ -944,27 +957,6 @@ class MinimapPlugin extends Plugin {
               <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('toggleFloatingBtn')}</label>
               <span id="minimap-showfloatingtoggle" style="cursor:pointer;display:inline-block;">${this.settings.floatingToggleText || 'Swift'}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('fontSize')}</label>
-              <input type="number" id="minimap-floatingtogglefontsize" value="${this.settings.floatingToggleFontSize ?? 11}" min="8" max="24" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('paddingH')}</label>
-              <input type="number" id="minimap-floatingtogglepaddingh" value="${this.settings.floatingTogglePaddingH ?? 10}" min="2" max="30" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('paddingV')}</label>
-              <input type="number" id="minimap-floatingtogglepaddingv" value="${this.settings.floatingTogglePaddingV ?? 2}" min="0" max="15" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('opacity')}</label>
-              <input type="range" id="minimap-floatingtoggleopacity" value="${this.settings.floatingToggleOpacity ?? 0.6}" min="0.1" max="1" step="0.05" style="width:70px;">
-              <span id="minimap-floatingtoggleopacity-value" style="font-size:11px;min-width:28px;">${this.settings.floatingToggleOpacity ?? 0.6}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('hideStatusBar')}</label>
-              <input type="checkbox" id="minimap-hidestatusbar" ${this.settings.hideStatusBar ? 'checked' : ''}>
-            </div>
           </div>
           <div class="minimap-settings-section-title">${t('searchLimit')}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
@@ -1009,10 +1001,6 @@ class MinimapPlugin extends Plugin {
               <input type="range" id="minimap-piniconopacity" value="${this.settings.pinIconOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
               <span id="minimap-piniconopacity-value" style="font-size:11px;min-width:24px;">${this.settings.pinIconOpacity}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('iconText')}</label>
-              <input type="text" id="minimap-pinicontext" value="${this.settings.pinIconText || 'm'}" style="width:40px;text-align:center;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
           </div>
           <div id="minimap-follow-offset-section" style="display:${this.settings.pinIconMode === 'follow' ? 'block' : 'none'};">
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
@@ -1031,55 +1019,20 @@ class MinimapPlugin extends Plugin {
             </div>
           </div>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('colorSchemes')}</div>
-          <div class="minimap-settings-row">
-            <label>${t('simplifiedColor')}</label>
-            <input type="checkbox" id="minimap-simplifiedcolorscheme" ${this.settings.simplifiedColorScheme ? 'checked' : ''}>
-          </div>
           <div id="minimap-color-schemes"></div>
-          <button id="minimap-add-colorscheme" style="width:100%;margin-top:6px;padding:4px 8px;cursor:pointer;">${t('addColor')}</button>
           <div class="minimap-settings-section-title" style="margin-top:12px;">${t('counterStyle')}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterStylePreset')}</label>
-              <select id="minimap-counterstylepreset" style="padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-                <option value="default" ${this.settings.counterStylePreset === 'default' ? 'selected' : ''}>${t('counterPresetDefault')}</option>
-                <option value="glass" ${this.settings.counterStylePreset === 'glass' ? 'selected' : ''}>${t('counterPresetGlass')}</option>
-                <option value="gradient" ${this.settings.counterStylePreset === 'gradient' ? 'selected' : ''}>${t('counterPresetGradient')}</option>
-                <option value="outlined" ${this.settings.counterStylePreset === 'outlined' ? 'selected' : ''}>${t('counterPresetOutlined')}</option>
-                <option value="ribbon" ${this.settings.counterStylePreset === 'ribbon' ? 'selected' : ''}>${t('counterPresetRibbon')}</option>
-                <option value="dot" ${this.settings.counterStylePreset === 'dot' ? 'selected' : ''}>${t('counterPresetDot')}</option>
-              </select>
-            </div>
-          </div>
+          <div id="minimap-counter-preset-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('matchOpacity')}</label>
               <input type="range" id="minimap-matchopacity" value="${this.settings.matchOpacity ?? 0.6}" min="0.1" max="1" step="0.05" style="width:70px;">
               <span id="minimap-matchopacity-value" style="font-size:11px;min-width:28px;">${this.settings.matchOpacity ?? 0.6}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterOpacity')}</label>
-              <input type="range" id="minimap-counteropacity" value="${this.settings.counterOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
-              <span id="minimap-counteropacity-value" style="font-size:11px;min-width:24px;">${this.settings.counterOpacity}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterBgOpacity')}</label>
-              <input type="range" id="minimap-counterbgopacity" value="${this.settings.counterBgOpacity}" min="0.1" max="1" step="0.1" style="width:70px;">
-              <span id="minimap-counterbgopacity-value" style="font-size:11px;min-width:24px;">${this.settings.counterBgOpacity}</span>
-            </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterFontSize')}</label>
               <input type="number" id="minimap-countersize" value="${this.settings.counterSize}" min="6" max="16" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterPaddingH')}</label>
-              <input type="number" id="minimap-counterpaddingh" value="${this.settings.counterPaddingH}" min="0" max="10" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterPaddingV')}</label>
-              <input type="number" id="minimap-counterpaddingv" value="${this.settings.counterPaddingV}" min="-10" max="10" step="1" style="width:55px;padding:4px 6px;border:1px solid var(--background-modifier-border);border-radius:4px;background:var(--background-primary);color:var(--text-normal);font-size:12px;">
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="white-space:nowrap;font-size:12px;color:var(--text-normal);">${t('counterTopOffset')}</label>
@@ -1168,7 +1121,6 @@ class MinimapPlugin extends Plugin {
     
     const closeBtn = this.settingsPanel.querySelector('.minimap-settings-close');
     closeBtn.addEventListener('click', () => this.closeSettingsPanel());
-    
     const langToggle = this.settingsPanel.querySelector('#minimap-lang-toggle');
     if (langToggle) {
       langToggle.addEventListener('click', async (e) => {
@@ -1220,15 +1172,6 @@ class MinimapPlugin extends Plugin {
       }, { passive: false });
     });
 
-    this.boundOutsideClick = (e) => {
-      if (!this.settingsPanel) return;
-      if (!this.settingsPanel.contains(e.target)) {
-        updateSettings();
-        this.closeSettingsPanel();
-      }
-    };
-    document.addEventListener('mousedown', this.boundOutsideClick);
-    
     const inputs = {
       blacklist: this.settingsPanel.querySelector('#minimap-blacklist'),
       top: this.settingsPanel.querySelector('#minimap-top'),
@@ -1242,41 +1185,26 @@ class MinimapPlugin extends Plugin {
       collapseonhover: this.settingsPanel.querySelector('#minimap-collapseonhover'),
       collapsewidth: this.settingsPanel.querySelector('#minimap-collapsewidth'),
       matchopacity: this.settingsPanel.querySelector('#minimap-matchopacity'),
-      counteropacity: this.settingsPanel.querySelector('#minimap-counteropacity'),
-      counterbgopacity: this.settingsPanel.querySelector('#minimap-counterbgopacity'),
       countersize: this.settingsPanel.querySelector('#minimap-countersize'),
-      counterpaddingh: this.settingsPanel.querySelector('#minimap-counterpaddingh'),
-      counterpaddingv: this.settingsPanel.querySelector('#minimap-counterpaddingv'),
       countertopoffset: this.settingsPanel.querySelector('#minimap-countertopoffset'),
-      floatingtogglefontsize: this.settingsPanel.querySelector('#minimap-floatingtogglefontsize'),
-      floatingtogglepaddingh: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingh'),
-      floatingtogglepaddingv: this.settingsPanel.querySelector('#minimap-floatingtogglepaddingv'),
-      floatingtoggleopacity: this.settingsPanel.querySelector('#minimap-floatingtoggleopacity'),
       clearcountonclose: this.settingsPanel.querySelector('#minimap-clearcountonclose'),
-      hidestatusbar: this.settingsPanel.querySelector('#minimap-hidestatusbar'),
       piniconenabled: this.settingsPanel.querySelector('#minimap-piniconenabled'),
       piniconmode: this.settingsPanel.querySelector('#minimap-piniconmode'),
       piniconsize: this.settingsPanel.querySelector('#minimap-piniconsize'),
       piniconopacity: this.settingsPanel.querySelector('#minimap-piniconopacity'),
-      pinicontext: this.settingsPanel.querySelector('#minimap-pinicontext'),
       piniconfollowoffsetx: this.settingsPanel.querySelector('#minimap-piniconfollowoffsetx'),
       piniconfollowoffsety: this.settingsPanel.querySelector('#minimap-piniconfollowoffsety'),
-      simplifiedcolorscheme: this.settingsPanel.querySelector('#minimap-simplifiedcolorscheme'),
       searchwordcountmin: this.settingsPanel.querySelector('#minimap-searchwordcountmin'),
       searchwordcountmax: this.settingsPanel.querySelector('#minimap-searchwordcountmax'),
-      counterstylepreset: this.settingsPanel.querySelector('#minimap-counterstylepreset'),
       multikeywordrequireall: this.settingsPanel.querySelector('#minimap-multikeywordrequireall'),
       searchoninput: this.settingsPanel.querySelector('#minimap-searchoninput')
     };
 
-    const counterBgOpacityValue = this.settingsPanel.querySelector('#minimap-counterbgopacity-value');
     const matchOpacityValue = this.settingsPanel.querySelector('#minimap-matchopacity-value');
     
     const opacityValue = this.settingsPanel.querySelector('#minimap-opacity-value');
     const contentOpacityValue = this.settingsPanel.querySelector('#minimap-contentopacity-value');
-    const counterOpacityValue = this.settingsPanel.querySelector('#minimap-counteropacity-value');
     const pinIconOpacityValue = this.settingsPanel.querySelector('#minimap-piniconopacity-value');
-    const floatingToggleOpacityValue = this.settingsPanel.querySelector('#minimap-floatingtoggleopacity-value');
     
     const updateSettings = () => {
       this.settings.minimapBlacklist = inputs.blacklist.value;
@@ -1291,39 +1219,24 @@ class MinimapPlugin extends Plugin {
       this.settings.collapseOnHover = inputs.collapseonhover.checked;
       this.settings.collapseWidth = parseFloat(inputs.collapsewidth.value) || DEFAULT_SETTINGS.collapseWidth;
       this.settings.matchOpacity = parseFloat(inputs.matchopacity.value) || DEFAULT_SETTINGS.matchOpacity;
-      this.settings.counterOpacity = parseFloat(inputs.counteropacity.value) || DEFAULT_SETTINGS.counterOpacity;
-      this.settings.counterBgOpacity = parseFloat(inputs.counterbgopacity.value) || DEFAULT_SETTINGS.counterBgOpacity;
       this.settings.counterSize = parseFloat(inputs.countersize.value) || DEFAULT_SETTINGS.counterSize;
-      this.settings.counterPaddingH = parseFloat(inputs.counterpaddingh.value) || DEFAULT_SETTINGS.counterPaddingH;
-      this.settings.counterPaddingV = isNaN(parseFloat(inputs.counterpaddingv.value)) ? DEFAULT_SETTINGS.counterPaddingV : parseFloat(inputs.counterpaddingv.value);
       this.settings.counterTopOffset = isNaN(parseFloat(inputs.countertopoffset.value)) ? DEFAULT_SETTINGS.counterTopOffset : parseFloat(inputs.countertopoffset.value);
-      this.settings.counterStylePreset = inputs.counterstylepreset.value || 'default';
 
-      this.settings.floatingToggleFontSize = parseFloat(inputs.floatingtogglefontsize.value) || DEFAULT_SETTINGS.floatingToggleFontSize;
-      this.settings.floatingTogglePaddingH = parseFloat(inputs.floatingtogglepaddingh.value) || DEFAULT_SETTINGS.floatingTogglePaddingH;
-      this.settings.floatingTogglePaddingV = parseFloat(inputs.floatingtogglepaddingv.value) ?? DEFAULT_SETTINGS.floatingTogglePaddingV;
-      this.settings.floatingToggleOpacity = parseFloat(inputs.floatingtoggleopacity.value) || DEFAULT_SETTINGS.floatingToggleOpacity;
       this.settings.clearCountOnClose = inputs.clearcountonclose.checked;
-      this.settings.hideStatusBar = inputs.hidestatusbar.checked;
       this.settings.searchWordCountMin = parseInt(inputs.searchwordcountmin.value) || 0;
       this.settings.searchWordCountMax = parseInt(inputs.searchwordcountmax.value) || 0;
       this.settings.pinIconEnabled = inputs.piniconenabled.checked;
       this.settings.pinIconMode = inputs.piniconmode.value;
       this.settings.pinIconSize = parseFloat(inputs.piniconsize.value) || DEFAULT_SETTINGS.pinIconSize;
       this.settings.pinIconOpacity = parseFloat(inputs.piniconopacity.value) || DEFAULT_SETTINGS.pinIconOpacity;
-      this.settings.pinIconText = inputs.pinicontext.value || DEFAULT_SETTINGS.pinIconText;
       this.settings.pinIconFollowOffsetX = parseInt(inputs.piniconfollowoffsetx.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
       this.settings.pinIconFollowOffsetY = parseInt(inputs.piniconfollowoffsety.value) ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
-      this.settings.simplifiedColorScheme = inputs.simplifiedcolorscheme.checked;
       this.settings.multiKeywordRequireAll = inputs.multikeywordrequireall.checked;
       this.settings.searchOnInput = inputs.searchoninput.checked;
       opacityValue.textContent = this.settings.opacity.toFixed(1);
       contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
       matchOpacityValue.textContent = this.settings.matchOpacity.toFixed(2);
-      counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
-      counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
       pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
-      floatingToggleOpacityValue.textContent = this.settings.floatingToggleOpacity.toFixed(2);
       this.saveSettings();
       this.applySettings();
       this.setupMinimap();
@@ -1374,28 +1287,15 @@ class MinimapPlugin extends Plugin {
       inputs.collapseonhover.checked = this.settings.collapseOnHover;
       inputs.collapsewidth.value = this.settings.collapseWidth;
       inputs.matchopacity.value = this.settings.matchOpacity ?? DEFAULT_SETTINGS.matchOpacity;
-      inputs.counteropacity.value = this.settings.counterOpacity;
-      inputs.counterbgopacity.value = this.settings.counterBgOpacity;
       inputs.countersize.value = this.settings.counterSize;
-      inputs.counterpaddingh.value = this.settings.counterPaddingH;
-      inputs.counterpaddingv.value = this.settings.counterPaddingV;
       inputs.countertopoffset.value = this.settings.counterTopOffset;
-      inputs.counterstylepreset.value = this.settings.counterStylePreset;
-
-      inputs.floatingtogglefontsize.value = this.settings.floatingToggleFontSize;
-      inputs.floatingtogglepaddingh.value = this.settings.floatingTogglePaddingH;
-      inputs.floatingtogglepaddingv.value = this.settings.floatingTogglePaddingV;
-      inputs.floatingtoggleopacity.value = this.settings.floatingToggleOpacity;
       inputs.clearcountonclose.checked = this.settings.clearCountOnClose;
-      inputs.hidestatusbar.checked = this.settings.hideStatusBar;
       inputs.piniconenabled.checked = this.settings.pinIconEnabled;
       inputs.piniconmode.value = this.settings.pinIconMode;
       inputs.piniconsize.value = this.settings.pinIconSize;
       inputs.piniconopacity.value = this.settings.pinIconOpacity;
-      inputs.pinicontext.value = this.settings.pinIconText || 'm';
       inputs.piniconfollowoffsetx.value = this.settings.pinIconFollowOffsetX ?? DEFAULT_SETTINGS.pinIconFollowOffsetX;
       inputs.piniconfollowoffsety.value = this.settings.pinIconFollowOffsetY ?? DEFAULT_SETTINGS.pinIconFollowOffsetY;
-      inputs.simplifiedcolorscheme.checked = this.settings.simplifiedColorScheme;
       inputs.multikeywordrequireall.checked = this.settings.multiKeywordRequireAll !== false;
       inputs.searchoninput.checked = this.settings.searchOnInput;
       inputs.searchwordcountmin.value = this.settings.searchWordCountMin ?? 0;
@@ -1403,12 +1303,30 @@ class MinimapPlugin extends Plugin {
       opacityValue.textContent = this.settings.opacity.toFixed(1);
       contentOpacityValue.textContent = this.settings.contentOpacity.toFixed(1);
       matchOpacityValue.textContent = this.settings.matchOpacity.toFixed(2);
-      counterOpacityValue.textContent = this.settings.counterOpacity.toFixed(1);
-      counterBgOpacityValue.textContent = this.settings.counterBgOpacity.toFixed(1);
       pinIconOpacityValue.textContent = this.settings.pinIconOpacity.toFixed(1);
-      floatingToggleOpacityValue.textContent = this.settings.floatingToggleOpacity.toFixed(2);
+      // 重置悬浮按钮样式为 candy-mark 默认样式
+      this.floatingStyles = [{
+        id: Date.now().toString(),
+        name: this.settings.floatingToggleText || 'Swift',
+        styleClass: this.settings.floatingToggleStyleClass,
+        customStyle: this.settings.floatingToggleCustomStyle
+      }];
+      this.floatingDefaultStyleId = this.floatingStyles[0].id;
+      this.saveFloatingStyleData();
+      this.applyFloatingCustomStyle();
+      // 重置后悬浮按钮默认显示
+      this.settings.floatingToggleVisible = true;
+      if (this.floatingToggleWrapper) {
+        this.floatingToggleWrapper.remove();
+        this.floatingToggleWrapper = null;
+        this.floatingToggle = null;
+        this.floatingToggleText = null;
+        this.floatingSearchBox = null;
+      }
+      this.createFloatingToggle();
       this.saveSettings();
       this.applySettings();
+      if (this._applySettingsBtnStyle) this._applySettingsBtnStyle();
       renderColorSchemes();
       renderPinnedList();
     });
@@ -1467,79 +1385,383 @@ class MinimapPlugin extends Plugin {
 
     // Render color schemes
     const colorSchemesContainer = this.settingsPanel.querySelector('#minimap-color-schemes');
+    let _colorSchemePopup = null;
+    const closeColorSchemePopup = () => {
+      if (_colorSchemePopup) { _colorSchemePopup.remove(); _colorSchemePopup = null; }
+    };
     const renderColorSchemes = () => {
       colorSchemesContainer.innerHTML = '';
+      closeColorSchemePopup();
       const schemes = this.settings.pinColorSchemes || [];
-      const simplified = this.settings.simplifiedColorScheme;
-      if (simplified) {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:4px 0;';
-        schemes.forEach((scheme, index) => {
-          const input = document.createElement('input');
-          input.type = 'color';
-          input.value = scheme.counterColor;
-          input.dataset.schemeIndex = index;
-          input.dataset.schemeField = 'counterColor';
-          input.style.cssText = 'width:28px;height:22px;padding:0;flex-shrink:0;';
-          row.appendChild(input);
-        });
-        colorSchemesContainer.appendChild(row);
-      } else {
-        schemes.forEach((scheme, index) => {
-          const row = document.createElement('div');
-          row.className = 'minimap-settings-row';
-          row.style.alignItems = 'center';
-          row.style.gap = '6px';
-          row.style.flexWrap = 'nowrap';
-          row.innerHTML = `
-            <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${index + 1}</span>
-            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('border')}</label><input type="color" value="${scheme.borderColor}" data-scheme-index="${index}" data-scheme-field="borderColor" style="width:28px;height:22px;padding:0;"></span>
-            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('background')}</label><input type="color" value="${scheme.counterBgColor}" data-scheme-index="${index}" data-scheme-field="counterBgColor" style="width:28px;height:22px;padding:0;"></span>
-            <span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0;"><label style="font-size:11px;">${t('text')}</label><input type="color" value="${scheme.counterColor}" data-scheme-index="${index}" data-scheme-field="counterColor" style="width:28px;height:22px;padding:0;"></span>
-            <button data-scheme-delete="${index}" style="font-size:12px;padding:0 4px;cursor:pointer;color:var(--text-muted);flex-shrink:0;">×</button>
+      const presetClass = this.getCounterPresetClass().trim();
+
+      const chipsRow = document.createElement('div');
+      chipsRow.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;';
+
+      schemes.forEach((scheme, index) => {
+        const chip = document.createElement('div');
+        chip.style.cssText = `
+          display:inline-flex;align-items:flex-end;cursor:pointer;
+          position:relative;user-select:none;
+          transition:box-shadow 0.15s ease, transform 0.1s ease;
+          margin-top:14px;
+          background:rgba(255,255,255,0.06);
+          border-radius:8px;
+          padding:2px 6px 2px 4px;
+          backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+        `;
+        // Text part with rounded underline (same as actual highlight)
+        const textSpan = document.createElement('span');
+        const matchOpacity = this.settings.matchOpacity ?? 0.6;
+        const c = this.hexToRgba(scheme.borderColor, matchOpacity);
+        textSpan.style.cssText = `
+          margin:0 -0.2em;padding:0 0.2em;
+          -webkit-box-decoration-break:clone;box-decoration-break:clone;
+          background:radial-gradient(farthest-side,${c} 98%,#0000) bottom left,linear-gradient(${c} 0 0) bottom,radial-gradient(farthest-side,${c} 98%,#0000) bottom right;
+          background-size:8px 8px,calc(100% - 8px) 8px;
+          background-repeat:no-repeat;
+          color:var(--text-normal);font-size:12px;line-height:1.4;
+        `;
+        textSpan.textContent = 'Preview';
+        chip.appendChild(textSpan);
+
+        // Counter badge (positioned like actual counter - above text)
+        const counter = document.createElement('span');
+        const counterFontSize = this.settings.counterSize;
+        const counterColor = scheme.counterColor;
+        let counterStyle = `
+          position:absolute;
+          top:var(--minimap-counter-top-offset, -10px);
+          left:0;
+          display:inline-flex;align-items:center;justify-content:center;
+          font-size:${counterFontSize}px;line-height:1;
+          padding:0px 2px;
+          white-space:nowrap;
+          pointer-events:none;
+        `;
+        if (presetClass === 'minimap-counter-glass') {
+          const isDark = document.body.classList.contains('theme-dark');
+          const glassCounterColor = isDark ? '#e0dcdc' : '#aba6a6';
+          counterStyle += `background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);box-shadow:0 2px 8px rgba(0,0,0,0.12),inset 0 1px 0 rgba(255,255,255,0.2);text-shadow:0 1px 2px rgba(0,0,0,0.3);border-radius:4px;color:${glassCounterColor};`;
+        } else if (presetClass === 'minimap-counter-outlined') {
+          const outlinedBorder = scheme.borderLinked !== false ? scheme.borderColor : scheme.counterBgColor;
+          const outlinedColor = scheme.counterLinked !== false ? outlinedBorder : scheme.counterColor;
+          counterStyle += `background:transparent;border:1.5px solid ${outlinedBorder};border-radius:4px;color:${outlinedColor};text-shadow:none;`;
+        }
+        counter.style.cssText = counterStyle;
+        counter.textContent = `${index + 1}/${schemes.length}`;
+        chip.appendChild(counter);
+
+        chip.addEventListener('mouseenter', () => { chip.style.boxShadow = '0 0 0 2px var(--interactive-accent)'; chip.style.transform = 'scale(1.04)'; });
+        chip.addEventListener('mouseleave', () => { chip.style.boxShadow = 'none'; chip.style.transform = 'none'; });
+
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeColorSchemePopup();
+
+          const popup = document.createElement('div');
+          popup.style.cssText = `
+            position:absolute;z-index:10000;
+            background:var(--background-secondary);
+            border:1px solid var(--background-modifier-border);
+            border-radius:8px;padding:10px 12px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.2);
+            display:flex;flex-direction:column;gap:8px;
           `;
-          colorSchemesContainer.appendChild(row);
-        });
-      }
+          const containerRect = colorSchemesContainer.getBoundingClientRect();
+          const panelRect = this.settingsPanel.getBoundingClientRect();
+          popup.style.top = `${containerRect.bottom - panelRect.top + 4}px`;
+          popup.style.left = `${Math.max(0, containerRect.left - panelRect.left)}px`;
 
-      // Bind color change events
-      colorSchemesContainer.querySelectorAll('input[type="color"]').forEach(input => {
-        input.addEventListener('input', (e) => {
-          const idx = parseInt(e.target.dataset.schemeIndex);
-          const field = e.target.dataset.schemeField;
-          this.settings.pinColorSchemes[idx][field] = e.target.value;
-          // 简化模式下，修改文字色时同步边框色和背景色
-          if (simplified && field === 'counterColor') {
-            this.settings.pinColorSchemes[idx].borderColor = e.target.value;
-            this.settings.pinColorSchemes[idx].counterBgColor = e.target.value;
+          const updateChipStyle = () => {
+            const s = this.settings.pinColorSchemes[index];
+            const newC = this.hexToRgba(s.borderColor, this.settings.matchOpacity ?? 0.6);
+            textSpan.style.background = `radial-gradient(farthest-side,${newC} 98%,#0000) bottom left,linear-gradient(${newC} 0 0) bottom,radial-gradient(farthest-side,${newC} 98%,#0000) bottom right`;
+            textSpan.style.backgroundSize = '8px 8px,calc(100% - 8px) 8px';
+            textSpan.style.backgroundRepeat = 'no-repeat';
+            // Update counter style based on preset
+            const currentPreset = this.settings.counterStylePreset || 'glass';
+            if (currentPreset === 'glass') {
+              const isDark = document.body.classList.contains('theme-dark');
+              counter.style.color = isDark ? '#e0dcdc' : '#aba6a6';
+              counter.style.background = 'rgba(255,255,255,0.15)';
+            } else {
+              const newCounterBg = s.borderLinked !== false ? s.borderColor : s.counterBgColor;
+              counter.style.borderColor = newCounterBg;
+              counter.style.color = s.counterLinked !== false ? newCounterBg : s.counterColor;
+            }
+          };
+
+          const refreshHighlights = () => {
+            this.saveSettings();
+            updateChipStyle();
+            this.applyCounterStyles();
+            if (this.currentSelection) this.highlightMatches();
+          };
+
+          const currentPreset = this.settings.counterStylePreset || 'glass';
+
+          // Horizontal row
+          const fieldsRow = document.createElement('div');
+          fieldsRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+          // 下划线 (always shown)
+          const underlineGroup = document.createElement('div');
+          underlineGroup.style.cssText = 'display:flex;align-items:center;gap:2px;';
+          underlineGroup.innerHTML = `<label style="font-size:10px;min-width:28px;">${t('underline')}</label>`;
+          const underlineInput = document.createElement('input');
+          underlineInput.type = 'color';
+          underlineInput.value = scheme.borderColor;
+          underlineInput.style.cssText = 'width:32px;height:24px;padding:0;cursor:pointer;';
+          underlineInput.addEventListener('input', (ev) => {
+            this.settings.pinColorSchemes[index].borderColor = ev.target.value;
+            refreshHighlights();
+          });
+          underlineGroup.appendChild(underlineInput);
+          fieldsRow.appendChild(underlineGroup);
+
+          if (currentPreset === 'glass') {
+            // 毛玻璃: 下划线 only (计数颜色固定，深浅自动切换)
+          } else if (currentPreset === 'outlined') {
+            // 描边气泡: 下划线 | =/≠ | 气泡边框 | =/≠ | 计数文字
+            // = / ≠ toggle between 下划线 and 气泡边框
+            const borderLinked = scheme.borderLinked !== false;
+            const borderToggle = document.createElement('span');
+            borderToggle.textContent = borderLinked ? '=' : '≠';
+            borderToggle.style.cssText = `
+              font-size:13px;font-weight:bold;cursor:pointer;
+              color:${borderLinked ? 'var(--interactive-accent)' : 'var(--text-muted)'};
+              user-select:none;padding:0 2px;
+              transition:color 0.15s ease;
+            `;
+            borderToggle.addEventListener('mouseenter', () => { borderToggle.style.color = 'var(--interactive-accent)'; });
+            borderToggle.addEventListener('mouseleave', () => { borderToggle.style.color = this.settings.pinColorSchemes[index].borderLinked !== false ? 'var(--interactive-accent)' : 'var(--text-muted)'; });
+            borderToggle.addEventListener('click', () => {
+              const s = this.settings.pinColorSchemes[index];
+              if (s.borderLinked !== false) {
+                s.borderLinked = false;
+                borderToggle.textContent = '≠';
+                borderToggle.style.color = 'var(--text-muted)';
+                borderInput.style.opacity = '1';
+              } else {
+                s.borderLinked = true;
+                s.counterBgColor = s.borderColor;
+                borderInput.value = s.borderColor;
+                borderToggle.textContent = '=';
+                borderToggle.style.color = 'var(--interactive-accent)';
+                borderInput.style.opacity = '0.4';
+                // Also sync counter if counterLinked
+                if (s.counterLinked !== false) {
+                  s.counterColor = s.counterBgColor;
+                  colorInput.value = s.counterBgColor;
+                }
+                refreshHighlights();
+              }
+            });
+            fieldsRow.appendChild(borderToggle);
+
+            // 气泡边框
+            const borderGroup = document.createElement('div');
+            borderGroup.style.cssText = 'display:flex;align-items:center;gap:2px;';
+            borderGroup.innerHTML = `<label style="font-size:10px;min-width:28px;">${t('bubbleBorder')}</label>`;
+            const borderInput = document.createElement('input');
+            borderInput.type = 'color';
+            borderInput.value = borderLinked ? scheme.borderColor : scheme.counterBgColor;
+            borderInput.style.cssText = 'width:32px;height:24px;padding:0;cursor:pointer;';
+            if (borderLinked) borderInput.style.opacity = '0.4';
+            borderInput.addEventListener('input', (ev) => {
+              if (this.settings.pinColorSchemes[index].borderLinked !== false) return;
+              this.settings.pinColorSchemes[index].counterBgColor = ev.target.value;
+              if (this.settings.pinColorSchemes[index].counterLinked !== false) {
+                this.settings.pinColorSchemes[index].counterColor = ev.target.value;
+                colorInput.value = ev.target.value;
+              }
+              refreshHighlights();
+            });
+            borderGroup.appendChild(borderInput);
+            fieldsRow.appendChild(borderGroup);
+
+            // = / ≠ toggle between 气泡边框 and 计数文字
+            const linked = scheme.counterLinked !== false;
+            const toggleSpan = document.createElement('span');
+            toggleSpan.textContent = linked ? '=' : '≠';
+            toggleSpan.style.cssText = `
+              font-size:13px;font-weight:bold;cursor:pointer;
+              color:${linked ? 'var(--interactive-accent)' : 'var(--text-muted)'};
+              user-select:none;padding:0 2px;
+              transition:color 0.15s ease;
+            `;
+            toggleSpan.addEventListener('mouseenter', () => { toggleSpan.style.color = 'var(--interactive-accent)'; });
+            toggleSpan.addEventListener('mouseleave', () => { toggleSpan.style.color = this.settings.pinColorSchemes[index].counterLinked !== false ? 'var(--interactive-accent)' : 'var(--text-muted)'; });
+            toggleSpan.addEventListener('click', () => {
+              const s = this.settings.pinColorSchemes[index];
+              if (s.counterLinked !== false) {
+                s.counterLinked = false;
+                toggleSpan.textContent = '≠';
+                toggleSpan.style.color = 'var(--text-muted)';
+                colorInput.style.opacity = '1';
+              } else {
+                s.counterLinked = true;
+                s.counterColor = s.counterBgColor;
+                colorInput.value = s.counterBgColor;
+                toggleSpan.textContent = '=';
+                toggleSpan.style.color = 'var(--interactive-accent)';
+                colorInput.style.opacity = '0.4';
+                refreshHighlights();
+              }
+            });
+            fieldsRow.appendChild(toggleSpan);
+
+            // 计数文字
+            const colorGroup = document.createElement('div');
+            colorGroup.style.cssText = 'display:flex;align-items:center;gap:2px;';
+            colorGroup.innerHTML = `<label style="font-size:10px;min-width:28px;">${t('counterTextColor')}</label>`;
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = linked ? (borderLinked ? scheme.borderColor : scheme.counterBgColor) : scheme.counterColor;
+            colorInput.style.cssText = 'width:32px;height:24px;padding:0;cursor:pointer;';
+            if (linked) colorInput.style.opacity = '0.4';
+            colorInput.addEventListener('input', (ev) => {
+              if (this.settings.pinColorSchemes[index].counterLinked !== false) return;
+              this.settings.pinColorSchemes[index].counterColor = ev.target.value;
+              refreshHighlights();
+            });
+            colorGroup.appendChild(colorInput);
+            fieldsRow.appendChild(colorGroup);
+
+            // Update underlineInput to sync border when borderLinked
+            underlineInput.addEventListener('input', (ev) => {
+              if (this.settings.pinColorSchemes[index].borderLinked !== false) {
+                this.settings.pinColorSchemes[index].counterBgColor = ev.target.value;
+                borderInput.value = ev.target.value;
+                if (this.settings.pinColorSchemes[index].counterLinked !== false) {
+                  this.settings.pinColorSchemes[index].counterColor = ev.target.value;
+                  colorInput.value = ev.target.value;
+                }
+              }
+            });
           }
-          this.saveSettings();
+
+          popup.appendChild(fieldsRow);
+
+          // Delete button
+          const delRow = document.createElement('div');
+          delRow.style.cssText = 'display:flex;justify-content:flex-end;margin-top:2px;';
+          const deleteBtn = document.createElement('button');
+          deleteBtn.style.cssText = 'font-size:11px;padding:2px 10px;cursor:pointer;color:var(--text-muted);border:1px solid var(--background-modifier-border);border-radius:4px;background:transparent;';
+          deleteBtn.textContent = t('remove');
+          deleteBtn.addEventListener('click', () => {
+            this.settings.pinColorSchemes.splice(index, 1);
+            this.saveSettings();
+            closeColorSchemePopup();
+            renderColorSchemes();
+            if (this.currentSelection) this.highlightMatches();
+          });
+          delRow.appendChild(deleteBtn);
+          popup.appendChild(delRow);
+
+          this.settingsPanel.appendChild(popup);
+          _colorSchemePopup = popup;
         });
+
+        chipsRow.appendChild(chip);
       });
 
-      // Bind delete events (non-simplified only)
-      colorSchemesContainer.querySelectorAll('button[data-scheme-delete]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const idx = parseInt(e.target.dataset.schemeDelete);
-          this.settings.pinColorSchemes.splice(idx, 1);
-          this.saveSettings();
-          renderColorSchemes();
-        });
+      // "+" add chip
+      const addChip = document.createElement('div');
+      addChip.style.cssText = `
+        display:inline-flex;align-items:center;justify-content:center;
+        width:30px;height:26px;border-radius:14px;cursor:pointer;
+        border:2px dashed var(--text-muted);
+        color:var(--text-muted);font-size:16px;font-weight:bold;
+        transition:all 0.15s ease;user-select:none;
+        background:rgba(255,255,255,0.06);
+        backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+      `;
+      addChip.textContent = '+';
+      addChip.addEventListener('mouseenter', () => {
+        addChip.style.borderColor = 'var(--interactive-accent)';
+        addChip.style.color = 'var(--interactive-accent)';
+        addChip.style.background = 'rgba(255,255,255,0.1)';
       });
+      addChip.addEventListener('mouseleave', () => {
+        addChip.style.borderColor = 'var(--text-muted)';
+        addChip.style.color = 'var(--text-muted)';
+        addChip.style.background = 'rgba(255,255,255,0.06)';
+      });
+      addChip.addEventListener('click', () => {
+        const colors = ['#f44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#FF5722', '#795548'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        this.settings.pinColorSchemes.push({
+          borderColor: randomColor,
+          counterBgColor: randomColor,
+          counterColor: '#aba6a6',
+          borderLinked: true,
+          counterLinked: true
+        });
+        this.saveSettings();
+        renderColorSchemes();
+        if (this.currentSelection) this.highlightMatches();
+      });
+      chipsRow.appendChild(addChip);
+
+      colorSchemesContainer.appendChild(chipsRow);
     };
 
-    // Add color scheme button
-    const addColorSchemeBtn = this.settingsPanel.querySelector('#minimap-add-colorscheme');
-    addColorSchemeBtn.addEventListener('click', () => {
-      const colors = ['#f44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#FF5722', '#795548'];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      this.settings.pinColorSchemes.push({
-        borderColor: randomColor,
-        counterBgColor: randomColor,
-        counterColor: '#ffffff'
+    // Close popup on click inside settings panel but outside popup
+    this.settingsPanel.addEventListener('click', (e) => {
+      if (_colorSchemePopup && !_colorSchemePopup.contains(e.target)) {
+        closeColorSchemePopup();
+      }
+    });
+
+    // Render counter style preset chips
+    const counterPresetChips = this.settingsPanel.querySelector('#minimap-counter-preset-chips');
+    const presetOptions = [
+      { value: 'glass', label: t('counterPresetGlass') },
+      { value: 'outlined', label: t('counterPresetOutlined') }
+    ];
+    presetOptions.forEach(opt => {
+      const chip = document.createElement('div');
+      const isActive = this.settings.counterStylePreset === opt.value;
+      chip.style.cssText = `
+        display:inline-flex;align-items:center;justify-content:center;
+        padding:3px 10px;border-radius:14px;cursor:pointer;
+        font-size:11px;user-select:none;
+        border:1.5px solid ${isActive ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+        background:${isActive ? 'var(--interactive-accent)' : 'transparent'};
+        color:${isActive ? 'var(--text-on-accent)' : 'var(--text-muted)'};
+        transition:all 0.15s ease;
+      `;
+      chip.textContent = opt.label;
+      chip.addEventListener('click', () => {
+        this.settings.counterStylePreset = opt.value;
+        this.saveSettings();
+        this.applyCounterStyles();
+        renderColorSchemes();
+        // Force refresh all decorations
+        this.clearHighlights();
+        this.showPinnedDecorations();
+        if (this.currentSelection) this.highlightMatches();
+        // Update chip styles
+        counterPresetChips.querySelectorAll(':scope > div').forEach((c, i) => {
+          const active = presetOptions[i].value === opt.value;
+          c.style.borderColor = active ? 'var(--interactive-accent)' : 'var(--background-modifier-border)';
+          c.style.background = active ? 'var(--interactive-accent)' : 'transparent';
+          c.style.color = active ? 'var(--text-on-accent)' : 'var(--text-muted)';
+        });
       });
-      this.saveSettings();
-      renderColorSchemes();
+      chip.addEventListener('mouseenter', () => {
+        if (this.settings.counterStylePreset !== opt.value) {
+          chip.style.borderColor = 'var(--text-muted)';
+        }
+      });
+      chip.addEventListener('mouseleave', () => {
+        if (this.settings.counterStylePreset !== opt.value) {
+          chip.style.borderColor = 'var(--background-modifier-border)';
+        }
+      });
+      counterPresetChips.appendChild(chip);
     });
 
     // Render pinned list
@@ -1631,16 +1853,6 @@ class MinimapPlugin extends Plugin {
 
     // 初始化折叠功能
     this.initCollapsibleSections();
-    
-    setTimeout(() => {
-      document.addEventListener('click', this.handleOutsideClick.bind(this), { once: true });
-    }, 10);
-  }
-
-  handleOutsideClick(e) {
-    if (this.settingsPanel && !this.settingsPanel.contains(e.target)) {
-      this.closeSettingsPanel();
-    }
   }
 
   closeSettingsPanel() {
@@ -1651,10 +1863,6 @@ class MinimapPlugin extends Plugin {
     if (this._settingsPanelDragCleanup) {
       this._settingsPanelDragCleanup();
       this._settingsPanelDragCleanup = null;
-    }
-    if (this.boundOutsideClick) {
-      document.removeEventListener('mousedown', this.boundOutsideClick);
-      this.boundOutsideClick = null;
     }
     if (this.settingsPanel) {
       this.settingsPanel.remove();
@@ -4036,26 +4244,23 @@ class MinimapPlugin extends Plugin {
     icon.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
 
     if (exactPinned) {
-      // Current selection is pinned - show unpin button
-      icon.textContent = '✕';
+      // Current selection is pinned - show unpin button (gray circle, gray x)
+      icon.textContent = 'x';
       icon.title = t('unpin');
-      const scheme = this.getPinnedColorScheme(exactPinned);
-      icon.style.backgroundColor = scheme.counterBgColor;
-      icon.style.color = scheme.counterColor;
+      icon.style.backgroundColor = '#888';
+      icon.style.color = '#fff';
     } else if (containedPinned.length > 0) {
-      // Current selection contains pinned texts - show clear button
-      icon.textContent = '✕';
+      // Current selection contains pinned texts - show clear button (gray circle, gray x)
+      icon.textContent = 'x';
       icon.title = t('clearPinned', containedPinned.length);
-      const scheme = containedPinned[0];
-      icon.style.backgroundColor = scheme.counterBgColor || '#cc0000';
-      icon.style.color = scheme.counterColor || '#ffffff';
+      icon.style.backgroundColor = '#888';
+      icon.style.color = '#fff';
     } else {
-      // Not pinned - show pin button
-      icon.textContent = this.settings.pinIconText || 'm';
+      // Not pinned - show pin button (gray circle, gray p)
+      icon.textContent = 'p';
       icon.title = t('pinMatch');
-      const scheme = this.getCurrentSelectionColorScheme();
-      icon.style.backgroundColor = scheme.counterBgColor;
-      icon.style.color = scheme.counterColor;
+      icon.style.backgroundColor = '#888';
+      icon.style.color = '#fff';
     }
 
     if (this.settings.pinIconMode === 'follow') {
@@ -4223,7 +4428,7 @@ class MinimapPlugin extends Plugin {
           this.savedMatchLists[existingIndex].pinned = true;
           this.savedMatchLists[existingIndex].borderColor = color;
           this.savedMatchLists[existingIndex].counterBgColor = color;
-          this.savedMatchLists[existingIndex].counterColor = '#ffffff';
+          this.savedMatchLists[existingIndex].counterColor = '#aba6a6';
           this.savedMatchLists[existingIndex]._multiKeywordParent = this.currentSelection;
           if (!this.savedMatchLists[existingIndex].filePath) {
             this.savedMatchLists[existingIndex].filePath = currentFilePath;
@@ -4236,7 +4441,7 @@ class MinimapPlugin extends Plugin {
             colorIndex: 0,
             borderColor: color,
             counterBgColor: color,
-            counterColor: '#ffffff',
+            counterColor: '#aba6a6',
             matchCount: 0,
             filePath: currentFilePath,
             fileName: currentFileName,
@@ -4728,19 +4933,18 @@ class MinimapPlugin extends Plugin {
 
     const borderColor = colorScheme ? colorScheme.borderColor : this.getCurrentSelectionColorScheme().borderColor;
 
-    const counterOpacity = this.settings.counterOpacity;
-    const counterBgOpacity = this.settings.counterBgOpacity;
     const counterColor = colorScheme ? colorScheme.counterColor : this.getCurrentSelectionColorScheme().counterColor;
     const counterBgColor = colorScheme ? colorScheme.counterBgColor : this.getCurrentSelectionColorScheme().counterBgColor;
     const counterSize = this.settings.counterSize;
-    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterPadding = '0px 2px';
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
     readingEl.style.setProperty('--minimap-match-color', borderColor);
 
-    readingEl.style.setProperty('--minimap-counter-opacity', counterOpacity);
+    readingEl.style.setProperty('--minimap-counter-opacity', 1);
     readingEl.style.setProperty('--minimap-counter-color', counterColor);
-    readingEl.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    const preset = this.settings.counterStylePreset || 'glass';
+    readingEl.style.setProperty('--minimap-counter-bgcolor', preset === 'outlined' ? counterBgColor : this.hexToRgba(counterBgColor, 1));
     readingEl.style.setProperty('--minimap-counter-size', `${counterSize}px`);
     readingEl.style.setProperty('--minimap-counter-padding', counterPadding);
     readingEl.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
@@ -5403,7 +5607,7 @@ class MinimapPlugin extends Plugin {
     if (!this.settings.enableSelectionMatch) return;
 
     // Check word count limits before proceeding with background search
-    const wordLen = searchText ? searchText.length : 0;
+    const wordLen = searchText ? searchText.trim().split(/\s+/).length : 0;
     const minWords = this.settings.searchWordCountMin ?? 0;
     const maxWords = this.settings.searchWordCountMax ?? 0;
     if (minWords > 0 && wordLen < minWords) return;
@@ -7988,19 +8192,17 @@ class MinimapPlugin extends Plugin {
     const scheme = this.getCurrentSelectionColorScheme();
     const borderColor = scheme.borderColor;
     const matchOpacity = this.settings.matchOpacity ?? 0.6;
-    const counterOpacity = this.settings.counterOpacity;
-    const counterBgOpacity = this.settings.counterBgOpacity;
     const counterColor = scheme.counterColor;
     const counterBgColor = scheme.counterBgColor;
     const counterSize = this.settings.counterSize;
-    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterPadding = '0px 2px';
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
     cm.scrollDOM.style.setProperty('--minimap-match-color', borderColor);
 
-    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
+    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', 1);
     cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
-    cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, 1));
     cm.scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
     cm.scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
     cm.scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
@@ -8038,17 +8240,11 @@ class MinimapPlugin extends Plugin {
     if (!cm || !cm.scrollDOM) return;
 
     const matchOpacity = this.settings.matchOpacity ?? 0.6;
-    const counterOpacity = this.settings.counterOpacity;
-    const counterBgOpacity = this.settings.counterBgOpacity;
-    const counterColor = this.settings.counterColor;
-    const counterBgColor = this.settings.counterBgColor;
     const counterSize = this.settings.counterSize;
-    const counterPadding = `${this.settings.counterPaddingV}px ${this.settings.counterPaddingH}px`;
+    const counterPadding = '0px 2px';
     const counterTopOffset = `${this.settings.counterTopOffset}px`;
 
-    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', counterOpacity);
-    cm.scrollDOM.style.setProperty('--minimap-counter-color', counterColor);
-    cm.scrollDOM.style.setProperty('--minimap-counter-bgcolor', this.hexToRgba(counterBgColor, counterBgOpacity));
+    cm.scrollDOM.style.setProperty('--minimap-counter-opacity', 1);
     cm.scrollDOM.style.setProperty('--minimap-counter-size', `${counterSize}px`);
     cm.scrollDOM.style.setProperty('--minimap-counter-padding', counterPadding);
     cm.scrollDOM.style.setProperty('--minimap-counter-top-offset', counterTopOffset);
@@ -8061,14 +8257,20 @@ class MinimapPlugin extends Plugin {
 
     const currentFile = this.app.workspace.activeLeaf?.view?.file;
     const currentFilePath = currentFile ? currentFile.path : null;
+    const currentPreset = this.settings.counterStylePreset || 'glass';
 
     // Add pinned decorations first
     const pinnedItems = this.savedMatchLists.filter(item => item.pinned && (!currentFilePath || !item.filePath || item.filePath === currentFilePath));
     for (const pinnedItem of pinnedItems) {
       const colorScheme = this.getPinnedColorScheme(pinnedItem);
       const pBorderColor = colorScheme.borderColor;
-      const pCounterBgColor = colorScheme.counterBgColor;
-      const pCounterColor = colorScheme.counterColor;
+      let pCounterBgColor = colorScheme.counterBgColor;
+      let pCounterColor = colorScheme.counterColor;
+      // 描边气泡样式下，计数边框和文字也跟随匹配透明度
+      if (currentPreset === 'outlined') {
+        pCounterBgColor = this.hexToRgba(pCounterBgColor, matchOpacity);
+        pCounterColor = this.hexToRgba(pCounterColor, matchOpacity);
+      }
       const searchLower = pinnedItem.selection.toLowerCase();
 
       // First pass: count total matches
@@ -8118,8 +8320,13 @@ class MinimapPlugin extends Plugin {
     if (!isCurrentPinned) {
       const currentColorScheme = this.getCurrentSelectionColorScheme();
       const currentBorderColor = currentColorScheme.borderColor;
-      const currentCounterBgColor = currentColorScheme.counterBgColor;
-      const currentCounterColor = currentColorScheme.counterColor;
+      let currentCounterBgColor = currentColorScheme.counterBgColor;
+      let currentCounterColor = currentColorScheme.counterColor;
+      // 描边气泡样式下，计数边框和文字也跟随匹配透明度
+      if (currentPreset === 'outlined') {
+        currentCounterBgColor = this.hexToRgba(currentCounterBgColor, matchOpacity);
+        currentCounterColor = this.hexToRgba(currentCounterColor, matchOpacity);
+      }
 
       for (let idx = 0; idx < matchLines.length; idx++) {
         const match = matchLines[idx];
@@ -8245,8 +8452,14 @@ class MinimapPlugin extends Plugin {
     for (const pinnedItem of pinnedItems) {
       const colorScheme = this.getPinnedColorScheme(pinnedItem);
       const borderColor = colorScheme.borderColor;
-      const counterBgColor = colorScheme.counterBgColor;
-      const counterColor = colorScheme.counterColor;
+      let counterBgColor = colorScheme.counterBgColor;
+      let counterColor = colorScheme.counterColor;
+      // 描边气泡样式下，计数边框和文字也跟随匹配透明度
+      const preset = this.settings.counterStylePreset || 'glass';
+      if (preset === 'outlined') {
+        counterBgColor = this.hexToRgba(counterBgColor, matchOpacity);
+        counterColor = this.hexToRgba(counterColor, matchOpacity);
+      }
 
       const searchLower = pinnedItem.selection.toLowerCase();
 
@@ -8281,7 +8494,7 @@ class MinimapPlugin extends Plugin {
                 attributes: {
                   'data-selection': pinnedItem.selection,
                   'data-match': `${matchIndex}/${totalPinnedMatches}`,
-                  'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(borderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${this.hexToRgba(counterBgColor, this.settings.counterBgOpacity)};--minimap-counter-color: ${counterColor};`
+                  'style': `margin:0 -0.2em;padding:0 0.2em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom left,linear-gradient(${this.hexToRgba(borderColor, matchOpacity)} 0 0) bottom,radial-gradient(farthest-side,${this.hexToRgba(borderColor, matchOpacity)} 98%,#0000) bottom right;background-size:8px 8px,calc(100% - 8px) 8px;background-repeat:no-repeat;--minimap-counter-bgcolor: ${counterBgColor};--minimap-counter-color: ${counterColor};`
                 }
               })
             });
@@ -8302,8 +8515,7 @@ class MinimapPlugin extends Plugin {
   }
 
   getCounterPresetClass() {
-    const preset = this.settings.counterStylePreset;
-    if (!preset || preset === 'default') return '';
+    const preset = this.settings.counterStylePreset || 'glass';
     return ` minimap-counter-${preset}`;
   }
 
@@ -8460,22 +8672,23 @@ class MinimapPlugin extends Plugin {
   }
 
   getPinnedColorScheme(pinnedItem) {
-    let scheme;
-    if (pinnedItem.borderColor && pinnedItem.counterBgColor && pinnedItem.counterColor) {
-      scheme = {
-        borderColor: pinnedItem.borderColor,
-        counterBgColor: pinnedItem.counterBgColor,
-        counterColor: pinnedItem.counterColor
-      };
-    } else {
-      const colorIndex = pinnedItem.colorIndex || 0;
-      const schemes = this.settings.pinColorSchemes || DEFAULT_SETTINGS.pinColorSchemes;
-      scheme = { ...schemes[colorIndex % schemes.length] };
-    }
-    // 简化模式下，边框色=文字色，背景色=文字色+计数背景透明度
-    if (this.settings.simplifiedColorScheme) {
-      scheme.borderColor = scheme.counterColor;
-      scheme.counterBgColor = this.hexToRgba(scheme.counterColor, this.settings.counterBgOpacity);
+    const colorIndex = pinnedItem.colorIndex || 0;
+    const schemes = this.settings.pinColorSchemes || DEFAULT_SETTINGS.pinColorSchemes;
+    const scheme = { ...schemes[colorIndex % schemes.length] };
+    const preset = this.settings.counterStylePreset || 'glass';
+    if (preset === 'glass') {
+      // 毛玻璃: 计数颜色固定，深浅自动切换
+      const isDark = document.body.classList.contains('theme-dark');
+      scheme.counterColor = isDark ? '#e0dcdc' : '#aba6a6';
+    } else if (preset === 'outlined') {
+      // 描边气泡: borderLinked 时 counterBgColor = borderColor
+      if (scheme.borderLinked !== false) {
+        scheme.counterBgColor = scheme.borderColor;
+      }
+      // counterLinked 时 counterColor = counterBgColor
+      if (scheme.counterLinked !== false) {
+        scheme.counterColor = scheme.counterBgColor;
+      }
     }
     return scheme;
   }
@@ -8484,9 +8697,17 @@ class MinimapPlugin extends Plugin {
     const pinnedItems = this.savedMatchLists.filter(m => m.pinned);
     const nextColorIndex = pinnedItems.length % this.settings.pinColorSchemes.length;
     const scheme = { ...this.settings.pinColorSchemes[nextColorIndex] };
-    if (this.settings.simplifiedColorScheme) {
-      scheme.borderColor = scheme.counterColor;
-      scheme.counterBgColor = this.hexToRgba(scheme.counterColor, this.settings.counterBgOpacity);
+    const preset = this.settings.counterStylePreset || 'glass';
+    if (preset === 'glass') {
+      const isDark = document.body.classList.contains('theme-dark');
+      scheme.counterColor = isDark ? '#e0dcdc' : '#aba6a6';
+    } else if (preset === 'outlined') {
+      if (scheme.borderLinked !== false) {
+        scheme.counterBgColor = scheme.borderColor;
+      }
+      if (scheme.counterLinked !== false) {
+        scheme.counterColor = scheme.counterBgColor;
+      }
     }
     return scheme;
   }
@@ -8600,6 +8821,7 @@ class MinimapPlugin extends Plugin {
   }
 
   onunload() {
+    if (this._themeObserver) this._themeObserver.disconnect();
     this.closeSettingsPanel();
     this.closeFloatingContextMenu();
     this.closeFloatingEditPanel();
