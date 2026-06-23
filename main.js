@@ -100,8 +100,8 @@ const DEFAULT_SETTINGS = {
   floatingToggleCustomStyle: '.candy-mark { background: linear-gradient(120deg, #ffebcc 0%, #ffd9a5 100%); color: #b45f2b; padding: 2px 6px; border-radius: 12px; font-weight: 500; font-size: 0.9em; display: inline-block; }',
   keywordButtonStyles: {},
   minimapBlacklist: '*.canvas',
-  searchWordCountMin: 2,
-  searchWordCountMax: 7,
+  searchWordCountMin: 0,
+  searchWordCountMax: 0,
   language: 'zh',
   counterStylePreset: 'glass',
   multiKeywordRequireAll: true,
@@ -259,8 +259,8 @@ const I18N = {
     paddingV: 'Vertical Padding (px)',
     hideStatusBar: 'Hide Status Bar',
     searchLimit: 'Search Limits',
-    minWords: 'Min Words (0=no limit)',
-    maxWords: 'Max Words (0=no limit)',
+    minWords: 'Min Words (0=no limit; CJK counts by char)',
+    maxWords: 'Max Words (0=no limit; CJK counts by char)',
     pinIcon: 'Pin Icon',
     enablePinIcon: 'Enable Pin Icon',
     iconMode: 'Icon Mode',
@@ -517,6 +517,14 @@ class MinimapPlugin extends Plugin {
         const parsed = JSON.parse(saved);
         this.settings = Object.assign({}, DEFAULT_SETTINGS, parsed);
         this.settings.exhaustiveMode = true;
+        // Migrate legacy default (2/7) which blocked all CJK single-phrase searches.
+        // Now countWords() handles CJK by character count, but the old 2/7 values
+        // were a bug default — reset to 0/0 (no limit) so users start clean.
+        if (this.settings.searchWordCountMin === 2 && this.settings.searchWordCountMax === 7) {
+          this.settings.searchWordCountMin = 0;
+          this.settings.searchWordCountMax = 0;
+          this.saveSettings();
+        }
         if (!this.settings.pinColorSchemes || !Array.isArray(this.settings.pinColorSchemes) || this.settings.pinColorSchemes.length === 0) {
           this.settings.pinColorSchemes = DEFAULT_SETTINGS.pinColorSchemes.map(s => ({...s}));
         }
@@ -5602,12 +5610,44 @@ class MinimapPlugin extends Plugin {
     }
   }
 
+  /**
+   * Count words/characters for search limit checking.
+   * - Pure CJK text (no spaces): count by characters (each CJK char = 1 unit)
+   * - Mixed or Latin text: count by whitespace-separated words
+   * This makes searchWordCountMin/Max work correctly for both Chinese and English.
+   */
+  countWords(text) {
+    if (!text) return 0;
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    // If text contains CJK characters and no spaces, count CJK chars + non-CJK tokens
+    const hasCJK = /[\u4e00-\u9fff\u3400-\u4dbf]/.test(trimmed);
+    const hasWhitespace = /\s/.test(trimmed);
+    if (hasCJK && !hasWhitespace) {
+      // Pure CJK (or CJK + punctuation without spaces): count characters
+      return trimmed.length;
+    }
+    if (hasCJK) {
+      // Mixed CJK + Latin with spaces: count CJK chars individually + Latin words
+      let count = 0;
+      // Count CJK characters
+      const cjkMatches = trimmed.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g);
+      if (cjkMatches) count += cjkMatches.length;
+      // Count Latin words (non-CJK, non-space sequences)
+      const latinMatches = trimmed.match(/[^\s\u4e00-\u9fff\u3400-\u4dbf]+/g);
+      if (latinMatches) count += latinMatches.length;
+      return count;
+    }
+    // Pure Latin: count whitespace-separated words
+    return trimmed.split(/\s+/).length;
+  }
+
   async showMatchList(searchText, matchCount) {
     if (!this.matchList) return;
     if (!this.settings.enableSelectionMatch) return;
 
     // Check word count limits before proceeding with background search
-    const wordLen = searchText ? searchText.trim().split(/\s+/).length : 0;
+    const wordLen = this.countWords(searchText);
     const minWords = this.settings.searchWordCountMin ?? 0;
     const maxWords = this.settings.searchWordCountMax ?? 0;
     if (minWords > 0 && wordLen < minWords) return;

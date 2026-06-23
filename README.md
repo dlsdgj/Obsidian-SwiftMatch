@@ -30,6 +30,17 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.6 (2026-06-24)</summary>
+
+- **Fixed Search & Selection Not Working / 修复搜索与划词失效** — Search box and text selection auto-search were broken because the default `searchWordCountMin: 2` blocked all single-phrase queries; Chinese text (no spaces) was always counted as 1 "word", so every search was silently rejected / 搜索框和划词自动搜索失效，原因是默认值 `searchWordCountMin: 2` 拦截了所有单短语查询；中文无空格永远算作 1 个"词"，导致所有搜索被静默拦截
+- **CJK-Aware Word Counting / 中文按字符计数** — Added `countWords()` method: pure CJK text counts by characters, mixed CJK+Latin counts CJK chars + Latin words, pure Latin counts by whitespace-separated words — so word count limits now work correctly for both Chinese and English / 新增 `countWords()` 方法：纯中文按字符数、中英混合按中文字符+英文词、纯英文按空格分词，使字数限制对中英文都生效
+- **Legacy Settings Migration / 旧设置迁移** — Automatically resets the buggy legacy default (min 2 / max 7) to 0/0 (no limit) on load, so existing users get search working again without manual intervention / 加载时自动将有问题的旧默认值（最少2/最多7）重置为 0/0（无限制），现有用户无需手动操作即可恢复搜索
+- **Default Limits Removed / 默认限制移除** — Default `searchWordCountMin` and `searchWordCountMax` changed to 0 (no limit); users can set custom limits in settings / 默认 `searchWordCountMin` 和 `searchWordCountMax` 改为 0（无限制）；用户可在设置中自定义限制
+- **Bilingual Label Update / 双语标签更新** — Updated min/max words setting labels to note that CJK text counts by character / 更新最少/最多字数设置标签，注明中文按字符数计算
+
+</details>
+
+<details>
 <summary>v1.4.5 (2026-06-24)</summary>
 
 - **Candy-mark Default Style / 糖果标记默认样式** — Reset to defaults now applies the candy-mark floating button style (warm gradient background, rounded corners) / 重置默认时应用 candy-mark 悬浮按钮样式（暖色渐变背景、圆角）

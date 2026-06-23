@@ -180,66 +180,12 @@ mark.minimap-counter-glass::after {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-mark.minimap-counter-gradient::after {
-  background: linear-gradient(135deg, var(--minimap-counter-bgcolor, #ff6600), color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 70%, #000));
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
-}
-
 mark.minimap-counter-outlined::after {
-  background: color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 12%, transparent);
+  background: transparent;
   border: 1.5px solid var(--minimap-counter-bgcolor, #ff6600);
   border-radius: 4px;
-  color: var(--minimap-counter-bgcolor, #ff6600);
+  color: var(--minimap-counter-color, var(--minimap-counter-bgcolor, #ff6600));
   text-shadow: none;
-}
-
-mark.minimap-counter-ribbon::after {
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  border-radius: 2px 2px 2px 0;
-  padding-right: 4px;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
-}
-
-mark.minimap-counter-ribbon::before {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 4px 0 0 5px;
-  border-color: color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 60%, #000) transparent transparent transparent;
-  pointer-events: none;
-}
-
-mark.minimap-counter-dot::after {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  padding: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: all 0.15s ease;
-}
-
-mark.minimap-counter-dot:hover::after {
-  content: attr(data-match);
-  width: auto;
-  height: auto;
-  border-radius: 4px;
-  padding: var(--minimap-counter-padding, 0 2px);
-  left: 0;
-  transform: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  color: var(--minimap-counter-color, white);
-  font-size: var(--minimap-counter-size, 9px);
 }
 
 .minimap-hide-counter::after {
@@ -274,71 +220,13 @@ mark.minimap-counter-dot:hover::after {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Gradient Capsule */
-.minimap-counter-gradient::after {
-  background: linear-gradient(135deg, var(--minimap-counter-bgcolor, #ff6600), color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 70%, #000));
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
-}
-
-/* Outlined */
+/* Outlined Bubble */
 .minimap-counter-outlined::after {
-  background: color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 12%, transparent);
+  background: transparent;
   border: 1.5px solid var(--minimap-counter-bgcolor, #ff6600);
   border-radius: 4px;
-  color: var(--minimap-counter-bgcolor, #ff6600);
+  color: var(--minimap-counter-color, var(--minimap-counter-bgcolor, #ff6600));
   text-shadow: none;
-}
-
-/* Ribbon */
-.minimap-counter-ribbon::after {
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  border-radius: 2px 2px 2px 0;
-  padding: var(--minimap-counter-padding, 0 2px);
-  padding-right: 4px;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
-}
-
-.minimap-counter-ribbon::before {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 4px 0 0 5px;
-  border-color: color-mix(in srgb, var(--minimap-counter-bgcolor, #ff6600) 60%, #000) transparent transparent transparent;
-  pointer-events: none;
-}
-
-/* Dot Indicator */
-.minimap-counter-dot::after {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  padding: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: all 0.15s ease;
-}
-
-.minimap-counter-dot:hover::after {
-  content: attr(data-match);
-  width: auto;
-  height: auto;
-  border-radius: 4px;
-  padding: var(--minimap-counter-padding, 0 2px);
-  left: 0;
-  transform: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  background: var(--minimap-counter-bgcolor, #ff6600);
-  color: var(--minimap-counter-color, white);
-  font-size: var(--minimap-counter-size, 9px);
 }
 
 .minimap-settings-panel {
@@ -386,17 +274,21 @@ mark.minimap-counter-dot:hover::after {
 }
 
 .minimap-settings-close {
-  background: none;
-  border: none;
-  font-size: 20px;
+  background: transparent;
+  border: 1.5px solid var(--background-modifier-border);
+  font-size: 14px;
   cursor: pointer;
   color: var(--text-muted);
-  padding: 0;
+  padding: 2px 6px;
   line-height: 1;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .minimap-settings-close:hover {
   color: var(--text-normal);
+  border-color: var(--text-muted);
+  background: var(--background-modifier-hover);
 }
 
 .minimap-settings-tabs {

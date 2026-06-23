@@ -1,6 +1,14 @@
 # Changelog
 
-## 🆕 v1.4.5 (2026-06-24)
+## 🆕 v1.4.6 (2026-06-24)
+
+- **Fixed Search & Selection Not Working** — Search box and text selection auto-search were broken because the default `searchWordCountMin: 2` blocked all single-phrase queries; Chinese text (no spaces) was always counted as 1 "word", so every search was silently rejected
+- **CJK-Aware Word Counting** — Added `countWords()` method: pure CJK text counts by characters, mixed CJK+Latin counts CJK chars + Latin words, pure Latin counts by whitespace-separated words — so word count limits now work correctly for both Chinese and English
+- **Legacy Settings Migration** — Automatically resets the buggy legacy default (min 2 / max 7) to 0/0 (no limit) on load, so existing users get search working again without manual intervention
+- **Default Limits Removed** — Default `searchWordCountMin` and `searchWordCountMax` changed to 0 (no limit); users can set custom limits in settings
+- **Bilingual Label Update** — Updated min/max words setting labels to note that CJK text counts by character
+
+## v1.4.5 (2026-06-24)
 
 - **Candy-mark Default Style** — Reset to defaults now applies the candy-mark floating button style (warm gradient background, rounded corners)
 - **Edit Panel Rename** — Renamed "编辑悬浮球" to "编辑悬浮按钮"
