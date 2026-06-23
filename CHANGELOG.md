@@ -1,6 +1,22 @@
 # Changelog
 
-## 🆕 v1.4.3 (2026-06-19)
+## 🆕 v1.4.5 (2026-06-24)
+
+- **Candy-mark Default Style** — Reset to defaults now applies the candy-mark floating button style (warm gradient background, rounded corners)
+- **Edit Panel Rename** — Renamed "编辑悬浮球" to "编辑悬浮按钮"
+- **Display Text Font Size** — Default display text font size changed from 11 to 16
+- **Settings Panel Cleanup** — Removed font size, horizontal padding, vertical padding, opacity, and hide status bar settings from the floating button style section
+- **Floating Button Default Visible** — Floating button is now shown by default after resetting to defaults
+
+## v1.4.4 (2026-06-23)
+
+- **Outlined Counter Opacity Link** — In outlined counter style, counter border and text opacity now follow the match opacity setting
+- **Counter Settings Cleanup** — Removed counter opacity, counter background opacity, counter horizontal/vertical padding settings; hardcoded padding to 0px 2px and opacity to 1
+- **Pin Icon Simplification** — Pin icon is now always a gray circle with gray "p"; clear/unpin icon is a gray circle with gray "x"; removed icon text setting
+- **Word Count for English** — Search word count limits now count words (space-separated) instead of characters
+- **Default Settings Update** — Updated default values: slider color #F0B27F, opacity 1.0, content opacity 1.0, hover collapse off, top 40, bottom offset 65, match opacity 0.15, pin icon size 12/opacity 0.7/offset 20/-20, min words 2, max words 7
+
+## v1.4.3 (2026-06-19)
 
 - **Snippet Expand Highlight Fix** — Fixed keyword highlights being lost when clicking the "+" button to expand truncated snippets; highlights now re-apply after markdown rendering completes for both single-keyword and multi-keyword searches
 - **Multi-Keyword Data Restore** — `_multiKeywordData` is now automatically restored from search text when `renderMatchList` is called from cached paths, preventing missing highlights on list re-render
