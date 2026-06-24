@@ -30,6 +30,13 @@ Search for "SwiftMatch" in Obsidian Settings → Community Plugins → Browse, t
 <summary>Changelog / 更新日志</summary>
 
 <details>
+<summary>v1.4.7 (2026-06-24)</summary>
+
+- **Floating Button Cleanup on Disable / 禁用插件时悬浮按钮清理** — Fixed floating toggle button remaining visible after disabling the plugin; `onunload()` now properly removes the floating toggle wrapper DOM element / 修复禁用插件后悬浮按钮仍显示的问题；`onunload()` 现在正确移除悬浮按钮包装 DOM 元素
+
+</details>
+
+<details>
 <summary>v1.4.6 (2026-06-24)</summary>
 
 - **Fixed Search & Selection Not Working / 修复搜索与划词失效** — Search box and text selection auto-search were broken because the default `searchWordCountMin: 2` blocked all single-phrase queries; Chinese text (no spaces) was always counted as 1 "word", so every search was silently rejected / 搜索框和划词自动搜索失效，原因是默认值 `searchWordCountMin: 2` 拦截了所有单短语查询；中文无空格永远算作 1 个"词"，导致所有搜索被静默拦截

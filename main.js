@@ -8932,6 +8932,10 @@ class MinimapPlugin extends Plugin {
     this._removeSwiftMatchExportNav();
     this.clearReadingViewHighlights();
     this.hideAllMatchListIndicators();
+    // Clean up floating toggle wrapper
+    if (this.floatingToggleWrapper && this.floatingToggleWrapper.parentNode) {
+      this.floatingToggleWrapper.parentNode.removeChild(this.floatingToggleWrapper);
+    }
     // Clean up floating keyword buttons
     for (const btnData of this._floatingKeywordButtons) {
       if (btnData.wrapper && btnData.wrapper.parentNode) {

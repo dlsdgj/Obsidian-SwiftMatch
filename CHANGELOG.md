@@ -1,6 +1,10 @@
 # Changelog
 
-## 🆕 v1.4.6 (2026-06-24)
+## 🆕 v1.4.7 (2026-06-24)
+
+- **Floating Button Cleanup on Disable** — Fixed floating toggle button remaining visible after disabling the plugin; `onunload()` now properly removes the floating toggle wrapper DOM element
+
+## v1.4.6 (2026-06-24)
 
 - **Fixed Search & Selection Not Working** — Search box and text selection auto-search were broken because the default `searchWordCountMin: 2` blocked all single-phrase queries; Chinese text (no spaces) was always counted as 1 "word", so every search was silently rejected
 - **CJK-Aware Word Counting** — Added `countWords()` method: pure CJK text counts by characters, mixed CJK+Latin counts CJK chars + Latin words, pure Latin counts by whitespace-separated words — so word count limits now work correctly for both Chinese and English
